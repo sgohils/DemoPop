@@ -1,0 +1,9 @@
+node_modules
+.next
+.npm-cache
+.git
+out
+public/sample
+public/fonts
+package-lock.json
+.render-*

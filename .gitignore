@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.npm-cache/
+.env*
+!.env.example
+.render-*/
+*.tsbuildinfo
+out/qa/
+out/browser-results/
+playwright-report/
