@@ -5,30 +5,18 @@ import {
   makeCancelSignal,
 } from "@remotion/renderer";
 import path from "node:path";
-import { mkdtemp, rm } from "node:fs/promises";
 import type { VideoProps } from "../src/shared/project";
-let bundled: Promise<string> | undefined;
-let bundleDir: string | undefined;
-export function getBundle() {
-  return (bundled ??= (async () => {
-    bundleDir = await mkdtemp(path.resolve(".render-bundle-"));
-    return bundle({
-      entryPoint: path.resolve("src/video/Root.tsx"),
-      publicDir: path.resolve("public"),
-      outDir: bundleDir,
-    });
-  })());
-}
-export async function cleanupBundle() {
-  if (bundleDir) {
-    const target = path.resolve(bundleDir);
-    if (!target.startsWith(path.resolve(".render-bundle-")))
-      throw new Error("Unexpected bundle cleanup path");
-    await rm(target, { recursive: true, force: true });
-    bundleDir = undefined;
-    bundled = undefined;
-  }
-}
+import { createBundleCache } from "./bundle-cache";
+
+const cache = createBundleCache((outDir) =>
+  bundle({
+    entryPoint: path.resolve("src/video/Root.tsx"),
+    publicDir: path.resolve("public"),
+    outDir,
+  }),
+);
+export const getBundle = cache.get;
+export const cleanupBundle = cache.cleanup;
 export async function renderVideo(
   inputProps: VideoProps,
   outputLocation: string,

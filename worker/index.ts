@@ -5,8 +5,9 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import {
   projectSchema,
-  TEMPLATE_VERSION,
+  SUPPORTED_TEMPLATE_VERSIONS,
   type Media,
+  SAMPLE_ASSETS,
 } from "../src/shared/project";
 import { safeStoragePath } from "../src/server/access";
 import { renderVideo, cleanupBundle } from "./render";
@@ -80,16 +81,18 @@ while (!stopping) {
     20000,
   );
   try {
-    if (job.template_version !== TEMPLATE_VERSION)
+    if (!SUPPORTED_TEMPLATE_VERSIONS.has(job.template_version))
       throw new Error("Unsupported template version");
     const project = projectSchema.parse(job.snapshot);
     async function media(id: string): Promise<Media> {
-      if (id === "sample-before" || id === "sample-after")
+      if (Object.prototype.hasOwnProperty.call(SAMPLE_ASSETS, id)) {
+        const asset = SAMPLE_ASSETS[id as keyof typeof SAMPLE_ASSETS];
         return {
-          src: `data:image/png;base64,${(await readFile(`public/sample/${id === "sample-before" ? "before" : "after"}.png`)).toString("base64")}`,
-          width: 1440,
-          height: 2000,
+          src: `data:image/png;base64,${(await readFile(`public/${asset.file}`)).toString("base64")}`,
+          width: asset.width,
+          height: asset.height,
         };
+      }
       const asset = await db
         .from("assets")
         .select("*")

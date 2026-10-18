@@ -6,6 +6,9 @@ export default defineConfig([
   ...ts,
   globalIgnores([
     ".next/**",
+    ".next-browser/**",
+    ".next-browser-cloud-ui/**",
+    ".next-preview/**",
     "node_modules/**",
     ".npm-cache/**",
     "out/**",

@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "preview": "node scripts/preview-server.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
@@ -18,8 +19,18 @@
     "worker": "tsx worker/index.ts",
     "verify:video": "tsx scripts/verify-video.ts",
     "test:browser": "playwright test",
+    "test:browser:cloud-ui": "playwright test --config playwright.cloud-ui.config.ts",
     "format": "prettier --write .",
-    "render:check": "tsx scripts/render-variant.ts"
+    "render:check": "tsx scripts/render-variant.ts",
+    "cleanup": "tsx scripts/cleanup-storage.ts",
+    "render:studio": "tsx scripts/render-studio-check.ts",
+    "render:launch": "tsx scripts/render-launch.ts",
+    "assets:launch": "tsx scripts/create-launch-assets.ts",
+    "audio:launch": "tsx scripts/create-launch-audio.ts",
+    "fonts:measure": "node scripts/measure-video-fonts.mjs",
+    "render:quality": "tsx scripts/render-launch-quality.ts",
+    "verify:launch": "tsx scripts/inspect-launch.ts",
+    "assets:home-film": "tsx scripts/create-demopop-film.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",

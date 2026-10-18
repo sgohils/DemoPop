@@ -1,0 +1,64 @@
+{
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "durationInSeconds": 15.019,
+  "codec": "h264",
+  "canPlayInVideoTag": true,
+  "supportsSeeking": true,
+  "colorSpace": "bt709",
+  "audioCodec": "aac",
+  "audioFileExtension": "aac",
+  "pixelFormat": "yuv420p",
+  "bytes": 5364431,
+  "faststart": true,
+  "maximumGopFrames": 15,
+  "keyframeCount": 32,
+  "posterFrame": 217,
+  "capture": {
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "deviceScaleFactor": 2,
+    "afterPresentation": "Unmodified real editor capture centered in a 6000×2400 graphite matte",
+    "before": "Real DemoPop Classic Reveal editor, opening scene",
+    "after": "Real DemoPop landscape Launch Film editor, closing identity",
+    "media": {
+      "before": {
+        "width": 2880,
+        "height": 2000
+      },
+      "after": {
+        "width": 6000,
+        "height": 2400
+      }
+    }
+  },
+  "project": {
+    "name": "DemoPop",
+    "template": "launch",
+    "format": "landscape",
+    "font": "dm-sans",
+    "sound": "pulse",
+    "cta": "Your next launch starts here.",
+    "opening": "Your launch.\nMake it move.",
+    "highlight1": "Two screenshots. One film.",
+    "highlight2": "Your product. In the spotlight.",
+    "color": "#8C9EFF",
+    "url": "Create your first film",
+    "before": "sample-launch-before",
+    "after": "sample-launch-after",
+    "logo": null,
+    "beforeCrop": {
+      "x": 0.5,
+      "y": 0.5,
+      "zoom": 1
+    },
+    "afterCrop": {
+      "x": 0.5,
+      "y": 0.5,
+      "zoom": 1
+    }
+  }
+}

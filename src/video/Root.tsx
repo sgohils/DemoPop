@@ -1,18 +1,31 @@
 import React from "react";
 import { Composition, registerRoot, staticFile } from "remotion";
-import { Reveal } from "./Reveal";
-import { VIDEO, sampleProject, sampleMedia } from "../shared/project";
+import { Showcase } from "./Showcase";
+import {
+  VIDEO,
+  launchProject,
+  launchMedia,
+  videoSettings,
+  projectSchema,
+} from "../shared/project";
 function Root() {
-  const media = sampleMedia();
+  const media = launchMedia();
   return (
     <Composition
       id="Reveal"
-      component={Reveal}
+      component={Showcase}
       {...VIDEO}
+      calculateMetadata={({ props }) => ({
+        ...videoSettings(projectSchema.parse(props.project)),
+        props: { ...props, project: projectSchema.parse(props.project) },
+      })}
       defaultProps={{
-        project: sampleProject,
-        before: { ...media.before, src: staticFile("sample/before.png") },
-        after: { ...media.after, src: staticFile("sample/after.png") },
+        project: launchProject,
+        before: {
+          ...media.before,
+          src: staticFile("sample/launch-before.png"),
+        },
+        after: { ...media.after, src: staticFile("sample/launch-after.png") },
         logo: null,
       }}
     />

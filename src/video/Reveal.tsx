@@ -1,50 +1,42 @@
-import React, { useEffect, useState } from "react";
 import {
   AbsoluteFill,
   Img,
   Easing,
   interpolate,
   useCurrentFrame,
-  delayRender,
-  continueRender,
   cancelRender,
-  staticFile,
 } from "remotion";
-import { coverGeometry, type VideoProps } from "../shared/project";
+import { coverGeometry, FONTS, type VideoProps } from "../shared/project";
+import { VideoFont } from "./VideoFont";
+import {
+  highlightGeometry,
+  mixColor,
+  readableTextColor,
+  REVEAL_BACKGROUND,
+  revealColors,
+} from "../shared/video-style";
 const ease = Easing.bezier(0.22, 1, 0.36, 1);
+const imageFailure = () => {
+  try {
+    cancelRender(
+      new Error("A video image could not load. Retry image access."),
+    );
+  } catch {
+    // Remotion stores this sanitized render error before throwing. Avoid logging
+    // its default source-bearing retries, which can include private link tokens.
+  }
+};
 const tween = (f: number, a: number, b: number, from = 0, to = 1) =>
   interpolate(f, [a, b], [from, to], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: ease,
   });
-function FontReady() {
-  const [handle] = useState(() => delayRender("Loading local Manrope font"));
-  useEffect(() => {
-    let active = true;
-    const font = new FontFace(
-      "Manrope",
-      `url(${staticFile("fonts/manrope.woff2")})`,
-      { weight: "200 800" },
-    );
-    font
-      .load()
-      .then((f) => {
-        document.fonts.add(f);
-        if (active) continueRender(handle);
-      })
-      .catch(cancelRender);
-    return () => {
-      active = false;
-    };
-  }, [handle]);
-  return null;
-}
 export function Reveal({ project: p, before, after, logo }: VideoProps) {
   const f = useCurrentFrame();
   const wipe = tween(f, 150, 210);
   const outro = tween(f, 360, 382);
-  const pan = tween(f, 210, 360, 1, 1.045);
+  const colors = revealColors(p.color);
   const image = (
     media: typeof before,
     crop: typeof p.beforeCrop,
@@ -52,15 +44,13 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
   ) => (
     <Img
       src={media.src}
+      maxRetries={0}
+      onImageError={imageFailure}
       style={{
         position: "absolute",
-        ...coverGeometry(
-          media,
-          crop,
-          936,
-          1050,
-          isAfter ? pan : tween(f, 60, 150, 1, 1.018),
-        ),
+        ...(isAfter
+          ? highlightGeometry(media, crop, 936, 1050, f)
+          : coverGeometry(media, crop, 936, 1050, tween(f, 60, 150, 1, 1.018))),
         maxWidth: "none",
       }}
     />
@@ -70,13 +60,13 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
   return (
     <AbsoluteFill
       style={{
-        fontFamily: "Manrope, Arial, sans-serif",
-        background: "#f5f3ed",
+        fontFamily: `${FONTS[p.font].name}, Arial, sans-serif`,
+        background: REVEAL_BACKGROUND,
         color: "#172126",
         overflow: "hidden",
       }}
     >
-      <FontReady />
+      <VideoFont key={p.font} font={p.font} />
       <div
         style={{
           position: "absolute",
@@ -91,7 +81,7 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
         }}
       >
         <span>THE REDESIGN</span>
-        <span style={{ color: p.color }}>01 / REVEAL</span>
+        <span style={{ color: colors.accent }}>01 / REVEAL</span>
       </div>
       <div
         style={{
@@ -107,7 +97,7 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
           style={{
             fontSize: 27,
             fontWeight: 650,
-            color: p.color,
+            color: colors.accent,
             marginBottom: 35,
             overflowWrap: "anywhere",
           }}
@@ -168,8 +158,8 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
               fontWeight: 700,
               padding: "12px 22px",
               borderRadius: 50,
-              color: f < 180 ? "#555" : p.color,
-              background: f < 180 ? "#e7e5df" : `${p.color}16`,
+              color: f < 180 ? "#555" : colors.badgeText,
+              background: f < 180 ? "#e7e5df" : colors.badgeBackground,
             }}
           >
             {f < 180 ? "BEFORE" : "AFTER"}
@@ -262,7 +252,7 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
             style={{
               fontSize: 20,
               letterSpacing: 3,
-              color: p.color,
+              color: colors.accent,
               fontWeight: 700,
               marginBottom: 17,
             }}
@@ -292,7 +282,7 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
           inset: 0,
           background: p.color,
           opacity: outro,
-          color: "white",
+          color: colors.outroText,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
@@ -303,6 +293,8 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
         {logo && (
           <Img
             src={logo.src}
+            maxRetries={0}
+            onImageError={imageFailure}
             style={{
               width: 140,
               height: 140,
@@ -316,7 +308,6 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
             fontSize: 23,
             letterSpacing: 4,
             marginBottom: 44,
-            opacity: 0.75,
           }}
         >
           A NEW CHAPTER FOR
@@ -333,7 +324,11 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
           {p.name}
         </div>
         <div
-          style={{ height: 2, background: "#ffffff55", margin: "64px 0 35px" }}
+          style={{
+            height: 2,
+            background: `${colors.outroText}55`,
+            margin: "64px 0 35px",
+          }}
         />
         <div
           style={{ fontSize: 36, lineHeight: 1.4, overflowWrap: "anywhere" }}
@@ -351,7 +346,10 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
           justifyContent: "space-between",
           fontSize: 20,
           letterSpacing: 2,
-          color: outro > 0.5 ? "#ffffffbb" : "#6b7574",
+          color:
+            outro > 0.5
+              ? readableTextColor(mixColor(REVEAL_BACKGROUND, p.color, outro))
+              : "#6b7574",
         }}
       >
         <span>THOUGHTFULLY REDESIGNED.</span>

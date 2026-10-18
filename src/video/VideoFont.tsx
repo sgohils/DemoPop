@@ -1,0 +1,33 @@
+import { useEffect, useState } from "react";
+import {
+  delayRender,
+  continueRender,
+  cancelRender,
+  staticFile,
+} from "remotion";
+import { FONTS, type ProjectInput } from "../shared/project";
+
+export function VideoFont({ font: key }: { font: ProjectInput["font"] }) {
+  const font = FONTS[key];
+  const [handle] = useState(() => delayRender("Loading bundled video font"));
+  useEffect(() => {
+    let active = true;
+    const face = new FontFace(font.name, `url(${staticFile(font.file)})`, {
+      weight: font.weight,
+    });
+    face
+      .load()
+      .then((loaded) => {
+        document.fonts.add(loaded);
+        if (active) continueRender(handle);
+      })
+      .catch(() =>
+        cancelRender(new Error("The bundled video font could not load.")),
+      );
+    return () => {
+      active = false;
+      continueRender(handle);
+    };
+  }, [font, handle]);
+  return null;
+}

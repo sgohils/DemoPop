@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100"><title>Orbit launch workspace</title><desc>Original interface for a fictional AI product, created for the DemoPop launch demonstration.</desc><defs><linearGradient id="composer" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#252838"/><stop offset="1" stop-color="#1c1f2b"/></linearGradient><radialGradient id="orbGlow" cx=".38" cy=".3" r=".8"><stop stop-color="#e7eaff"/><stop offset=".4" stop-color="#c5ceff"/><stop offset=".7" stop-color="#8c9eff"/><stop offset="1" stop-color="#5367ca"/></radialGradient></defs><g font-family="Segoe UI, Arial, sans-serif"><rect x="0" y="0" width="1600" height="1100" rx="0" fill="#08090d" stroke="none"/>
+  <rect x="40" y="38" width="1520" height="1024" rx="22" fill="#101116" stroke="#30313b"/>
+  <rect x="41" y="39" width="245" height="1022" rx="21" fill="#13141a" stroke="none"/>
+  <rect x="266" y="39" width="20" height="1022" rx="0" fill="#13141a" stroke="none"/>
+  <path d="M286 39H286V1061" fill="none" stroke="#272831"/>
+  <g transform="translate(83 88)" fill="none" stroke="#abb6ff" stroke-width="2.665"><circle cx="0" cy="0" r="11.48"/><ellipse rx="19.68" ry="7.79" transform="rotate(-38)"/></g>
+  <text x="114" y="98" font-size="34" fill="#f6f7fb" font-weight="600" letter-spacing="-1.3">orbit</text>
+  <rect x="61" y="146" width="204" height="49" rx="12" fill="#242631" stroke="#353744"/>
+  <path d="M78 170h12m-6-6v12" fill="none" stroke="#d7dcff" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="105" y="177" font-size="17" fill="#e7e9f5" font-weight="500" >New space</text>
+  <text x="65" y="243" font-size="11" fill="#737787" font-weight="600" letter-spacing="1.8">YOUR WORK</text>
+  <rect x="55" y="260" width="216" height="45" rx="10" fill="#232632" stroke="none"/>
+  <path d="M75 279l7-6 7 6v13h-14Z" fill="none" stroke="#a4b1ff" stroke-width="1.6"/>
+  <text x="105" y="289" font-size="16" fill="#d9e0ff" font-weight="500" >Home</text>
+  <path d="M75 327h15v15H75Zm0 5h15m-10-5v15" fill="none" stroke="#787c8e" stroke-width="1.5"/>
+  <text x="105" y="341" font-size="16" fill="#9499ab" font-weight="400" >Projects</text>
+  <g transform="translate(76 378)" fill="none" stroke="#787c8e" stroke-width="1.5"><rect width="15" height="19" rx="3"/><path d="M4 6h7M4 10h7M4 14h4"/></g>
+  <text x="105" y="393" font-size="16" fill="#9499ab" font-weight="400" >Library</text>
+  <text x="65" y="465" font-size="11" fill="#737787" font-weight="600" letter-spacing="1.8">SPACES</text>
+  <path d="M241 460h12m-6-6v12" fill="none" stroke="#737787" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="74" y="489" width="14" height="14" rx="4" fill="#8c9eff" stroke="none"/>
+  <text x="105" y="502" font-size="15" fill="#b8bdce" font-weight="400" >Product launch</text>
+  <rect x="74" y="537" width="14" height="14" rx="4" fill="#637b72" stroke="none"/>
+  <text x="105" y="550" font-size="15" fill="#8b91a3" font-weight="400" >Website refresh</text>
+  <path d="M63 964H263V964" fill="none" stroke="#292b34"/>
+  <rect x="70" y="989" width="34" height="34" rx="17" fill="#2d3041" stroke="none"/>
+  <text x="81" y="1013" font-size="15" fill="#cad1f1" font-weight="600" >A</text>
+  <text x="117" y="1007" font-size="15" fill="#cdd1df" font-weight="500" >Alex</text>
+  <text x="117" y="1027" font-size="11" fill="#7b8194" font-weight="400" >Personal workspace</text>
+  <text x="322" y="91" font-size="15" fill="#b3b7c7" font-weight="500" >Home</text>
+  <text x="1362" y="91" font-size="12" fill="#7f8598" font-weight="400" >All changes saved</text>
+  <circle cx="1344" cy="87" r="3" fill="#83b9a0"/>
+  <text x="902" y="185" font-size="11" fill="#8e94aa" font-weight="500" text-anchor="middle" letter-spacing="2.5">A LITTLE CLARITY. A LOT OF POSSIBILITY.</text>
+  <text x="902" y="253" font-size="58" fill="#f8f9ff" font-weight="500" text-anchor="middle" letter-spacing="-2.8">Make the next move.</text>
+  <text x="902" y="292" font-size="19" fill="#8e94a8" font-weight="400" text-anchor="middle">A clear path from what if to what’s next.</text>
+  <rect x="458" y="330" width="888" height="157" rx="24" fill="url(#composer)" stroke="#3d435b"/>
+  <text x="485" y="375" font-size="24" fill="#e7eaff" font-weight="400" letter-spacing="-.4">Plan a thoughtful product launch.</text>
+  <rect x="483" y="419" width="180" height="37" rx="9" fill="#282b3a" stroke="#3c4053"/>
+  <g transform="translate(496 428)" fill="none" stroke="#afb9ec" stroke-width="1.5"><rect width="15" height="19" rx="3"/><path d="M4 6h7M4 10h7M4 14h4"/></g>
+  <text x="521" y="444" font-size="14" fill="#b9c2e8" font-weight="400" >Product brief.pdf</text>
+  <rect x="1167" y="414" width="156" height="45" rx="13" fill="#a5b2ff" stroke="none"/>
+  <text x="1184" y="443" font-size="15" fill="#171c36" font-weight="600" >Create a plan</text>
+  <path d="M1305 443v-12m-5 5 5-5 5 5" fill="none" stroke="#171c36" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="482" y="528" font-size="11" fill="#757d94" font-weight="500" letter-spacing="1.8">YOUR LAUNCH, TAKING SHAPE</text>
+  <rect x="458" y="548" width="888" height="383" rx="22" fill="#191b23" stroke="#363946"/>
+  <rect x="481" y="573" width="40" height="40" rx="12" fill="#2d3352" stroke="none"/>
+  <path d="m491 596 8-13 11 13-11-4Z" fill="none" stroke="#a4b3ff" stroke-width="1.5" stroke-linejoin="round"/>
+  <text x="536" y="591" font-size="22" fill="#ecedf5" font-weight="500" letter-spacing="-.6">Product launch</text>
+  <text x="537" y="615" font-size="13" fill="#939aaf" font-weight="400" >A plan you can put in motion.</text>
+  <rect x="1218" y="580" width="102" height="29" rx="14" fill="#262d36" stroke="none"/>
+  <circle cx="1234" cy="594" r="3" fill="#a0ccbc"/>
+  <text x="1245" y="599" font-size="11" fill="#bdd6cc" font-weight="500" >Draft ready</text>
+  <path d="M482 637H1322V637" fill="none" stroke="#30333f"/>
+  <text x="483" y="674" font-size="10" fill="#727b93" font-weight="500" letter-spacing="1.6">NEXT STEPS</text>
+  <rect x="485" y="694" width="19" height="19" rx="5" fill="none" stroke="#9caeff"/><path d="m489 703 4 4 7-8" fill="none" stroke="#9caeff" stroke-width="1.7" stroke-linecap="round"/>
+  <text x="518" y="711" font-size="17" fill="#dfe3f4" font-weight="500" >Shape the story</text>
+  <text x="518" y="737" font-size="13" fill="#828ba3" font-weight="400" >Positioning, audience, and the big idea</text>
+  <path d="M484 755H915V755" fill="none" stroke="#2c303b"/>
+  <rect x="485" y="777" width="19" height="19" rx="5" fill="none" stroke="#626c87"/>
+  <text x="518" y="794" font-size="17" fill="#bfc7dd" font-weight="500" >Build the launch page</text>
+  <text x="518" y="820" font-size="13" fill="#828ba3" font-weight="400" >One clear message. One next step.</text>
+  <path d="M484 837H915V837" fill="none" stroke="#2c303b"/>
+  <rect x="485" y="858" width="19" height="19" rx="5" fill="none" stroke="#626c87"/>
+  <text x="518" y="875" font-size="17" fill="#bfc7dd" font-weight="500" >Ship the announcement</text>
+  <text x="518" y="901" font-size="13" fill="#828ba3" font-weight="400" >Launch copy, email, and social drafts</text>
+  <rect x="949" y="661" width="373" height="244" rx="15" fill="#f2f3fb" stroke="none"/>
+  <g transform="translate(970 683)" fill="none" stroke="#393e62" stroke-width="1.04"><circle cx="0" cy="0" r="4.48"/><ellipse rx="7.68" ry="3.04" transform="rotate(-38)"/></g>
+  <text x="984" y="687" font-size="10" fill="#383c58" font-weight="600" letter-spacing="-.3">orbit</text>
+  <text x="1286" y="687" font-size="12" fill="#848ba7" font-weight="400" >↗</text>
+  <circle cx="1238" cy="769" r="66" fill="url(#orbGlow)"/>
+  <ellipse cx="1238" cy="769" rx="75" ry="29" fill="none" stroke="#899bff" stroke-width="1" transform="rotate(-32 1238 769)" opacity=".6"/>
+  <text x="971" y="745" font-size="31" fill="#2a304c" font-weight="500" letter-spacing="-1.5">From idea.</text>
+  <text x="971" y="780" font-size="31" fill="#2a304c" font-weight="500" letter-spacing="-1.5">To done.</text>
+  <text x="972" y="810" font-size="9" fill="#7882a3" font-weight="400" >Your next big thing starts here.</text>
+  <rect x="971" y="828" width="100" height="25" rx="12" fill="#222944" stroke="none"/>
+  <text x="985" y="844" font-size="8" fill="#f2f3fb" font-weight="500" >Start creating</text>
+  <rect x="960" y="873" width="84" height="21" rx="8" fill="#fff" stroke="none"/>
+  <text x="970" y="887" font-size="9" fill="#727c9b" font-weight="500" >Landing page</text>
+  <text x="1131" y="887" font-size="10" fill="#667194" font-weight="400" >Open preview  ↗</text>
+  <rect x="724" y="966" width="356" height="42" rx="21" fill="#15171f" stroke="#2c303d"/>
+  <text x="754" y="993" font-size="13" fill="#9da7c0" font-weight="400" >Explore your space</text>
+  <text x="1012" y="994" font-size="21" fill="#9da7c0" font-weight="400" >→</text></g></svg>

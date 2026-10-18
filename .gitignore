@@ -1,10 +1,15 @@
 node_modules/
 .next/
+.next-browser/
+.next-browser-cloud-ui/
+.next-preview/
 .npm-cache/
 .env*
 !.env.example
 .render-*/
 *.tsbuildinfo
 out/qa/
+out/demopop-launch.mp4
 out/browser-results/
+out/cloud-ui-results/
 playwright-report/

@@ -19,6 +19,9 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
       await readFile("supabase/migrations/001_demopop.sql", "utf8")
     ).replace("create extension if not exists pgcrypto;", "");
     await db.exec(migration);
+    await db.exec(
+      await readFile("supabase/migrations/002_export_reuse_result.sql", "utf8"),
+    );
     const alice = "11111111-1111-4111-8111-111111111111",
       bob = "22222222-2222-4222-8222-222222222222",
       project = "33333333-3333-4333-8333-333333333333";
@@ -66,6 +69,15 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
         ]),
       /permission denied/,
     );
+    await assert.rejects(
+      () =>
+        db.query("select public.enqueue_render_with_result($1,$2,$3,10)", [
+          bob,
+          project,
+          sampleProject,
+        ]),
+      /permission denied/,
+    );
     await db.exec("reset role; set role service_role");
     await assert.rejects(
       () =>
@@ -77,19 +89,41 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
       /Not found/,
     );
     const enqueue = () =>
-      db.query<{ id: string }>(
-        "select public.enqueue_render($1,$2,$3,10) as id",
+      db.query<{ result: { id: string; reused: boolean } }>(
+        "select public.enqueue_render_with_result($1,$2,$3,10) as result",
         [alice, project, sampleProject],
       );
     const [first, second] = await Promise.all([enqueue(), enqueue()]);
-    assert.equal(first.rows[0].id, second.rows[0].id);
-    const jobId = first.rows[0].id;
+    assert.equal(first.rows[0].result.id, second.rows[0].result.id);
+    assert.deepEqual(
+      [first.rows[0].result.reused, second.rows[0].result.reused].sort(),
+      [false, true],
+    );
+    const jobId = first.rows[0].result.id;
     const changed = { ...sampleProject, opening: "Changed after starting" };
-    const reused = await db.query<{ id: string }>(
+    const reused = await db.query<{
+      result: { id: string; reused: boolean };
+    }>("select public.enqueue_render_with_result($1,$2,$3,10) as result", [
+      alice,
+      project,
+      changed,
+    ]);
+    assert.deepEqual(reused.rows[0].result, { id: jobId, reused: true });
+    const compatible = await db.query<{ id: string }>(
       "select public.enqueue_render($1,$2,$3,10) as id",
       [alice, project, changed],
     );
-    assert.equal(reused.rows[0].id, jobId);
+    assert.equal(compatible.rows[0].id, jobId);
+    assert.equal(
+      (
+        await db.query<{ settings: typeof sampleProject }>(
+          "select settings from public.projects where id=$1",
+          [project],
+        )
+      ).rows[0].settings.opening,
+      changed.opening,
+      "later edits stay saved without replacing the running snapshot",
+    );
     assert.equal(
       (
         await db.query<{ snapshot: typeof sampleProject }>(
@@ -114,6 +148,17 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
     }>("select * from public.claim_render()");
     assert.equal(claim.rows[0].id, jobId);
     assert.equal(claim.rows[0].attempt_count, 1);
+    const renderingReuse = await db.query<{
+      result: { id: string; reused: boolean };
+    }>("select public.enqueue_render_with_result($1,$2,$3,10) as result", [
+      alice,
+      project,
+      changed,
+    ]);
+    assert.deepEqual(renderingReuse.rows[0].result, {
+      id: jobId,
+      reused: true,
+    });
     assert.equal(
       (await db.query("select * from public.claim_render()")).rows.length,
       0,
@@ -176,6 +221,25 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
       () => db.query("select public.retry_render($1,$2,10)", [alice, jobId]),
       /Cannot retry/,
     );
+    const fresh = await db.query<{ result: { id: string; reused: boolean } }>(
+      "select public.enqueue_render_with_result($1,$2,$3,10) as result",
+      [alice, project, changed],
+    );
+    assert.equal(fresh.rows[0].result.reused, false);
+    assert.notEqual(fresh.rows[0].result.id, jobId);
+    assert.equal(
+      (
+        await db.query<{ snapshot: typeof sampleProject }>(
+          "select snapshot from public.render_jobs where id=$1",
+          [fresh.rows[0].result.id],
+        )
+      ).rows[0].snapshot.opening,
+      changed.opening,
+    );
+    await db.query(
+      "update public.render_jobs set status='completed' where id=$1",
+      [fresh.rows[0].result.id],
+    );
     await assert.rejects(
       () =>
         db.query("select public.enqueue_render($1,$2,$3,1)", [
@@ -195,7 +259,7 @@ test("real migration enforces queue deduplication, RLS, immutable snapshots, lea
     await db.exec(`set "request.jwt.claim.sub"='${alice}'`);
     assert.equal(
       (await db.query("select * from public.render_jobs")).rows.length,
-      1,
+      2,
     );
   } finally {
     await db.close();

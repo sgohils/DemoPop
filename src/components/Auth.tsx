@@ -12,7 +12,7 @@ export function Auth({
   confirmationFailed?: boolean;
 }) {
   const router = useRouter();
-  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [mode, setMode] = useState<"login" | "signup" | "recover">("login");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState(
@@ -67,11 +67,19 @@ export function Auth({
         </div>
         <section className="auth-card">
           <div className="eyebrow">WELCOME TO DEMOPOP</div>
-          <h2>{mode === "login" ? "Welcome back." : "Make something pop."}</h2>
+          <h2>
+            {mode === "recover"
+              ? "Get back to your work."
+              : mode === "login"
+                ? "Welcome back."
+                : "Make something pop."}
+          </h2>
           <p>
-            {mode === "login"
-              ? "Sign in to pick up where you left off."
-              : "Create an account to save and export your videos."}
+            {mode === "recover"
+              ? "Enter your account email to request a password recovery link."
+              : mode === "login"
+                ? "Sign in to pick up where you left off."
+                : "Create an account to save and export your videos."}
           </p>
           {!configured && (
             <div className="notice">
@@ -91,21 +99,23 @@ export function Auth({
                 disabled={!configured}
               />
             </label>
-            <label>
-              Password
-              <input
-                name="password"
-                type="password"
-                minLength={8}
-                maxLength={128}
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                required
-                placeholder="At least 8 characters"
-                disabled={!configured}
-              />
-            </label>
+            {mode !== "recover" && (
+              <label>
+                Password
+                <input
+                  name="password"
+                  type="password"
+                  minLength={8}
+                  maxLength={128}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  required
+                  placeholder="At least 8 characters"
+                  disabled={!configured}
+                />
+              </label>
+            )}
             {error && (
               <p className="error" role="alert">
                 {error}
@@ -119,12 +129,26 @@ export function Auth({
             <button className="button primary" disabled={!configured || busy}>
               {busy
                 ? "Please wait…"
-                : mode === "login"
-                  ? "Sign in"
-                  : "Create account"}
+                : mode === "recover"
+                  ? "Send recovery link"
+                  : mode === "login"
+                    ? "Sign in"
+                    : "Create account"}
               <ArrowRight size={17} />
             </button>
           </form>
+          {mode === "login" && (
+            <button
+              className="text-link recovery-link"
+              onClick={() => {
+                setMode("recover");
+                setError("");
+                setMessage("");
+              }}
+            >
+              Forgot password?
+            </button>
+          )}
           <p className="auth-switch">
             {mode === "login" ? "New here?" : "Already have an account?"}{" "}
             <button

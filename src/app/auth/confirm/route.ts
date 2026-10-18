@@ -7,6 +7,9 @@ export async function GET(req: NextRequest) {
   const token_hash = req.nextUrl.searchParams.get("token_hash"),
     type = req.nextUrl.searchParams.get("type") as EmailOtpType | null;
   const code = req.nextUrl.searchParams.get("code");
+  const recovery =
+    type === "recovery" ||
+    req.nextUrl.searchParams.get("next") === "/auth/reset";
   const client = await userClient();
   let error;
   if (token_hash && type) {
@@ -17,6 +20,13 @@ export async function GET(req: NextRequest) {
     error = true;
   }
   return NextResponse.redirect(
-    new URL(error ? "/auth?confirmation=failed" : "/projects", req.url),
+    new URL(
+      error
+        ? "/auth?confirmation=failed"
+        : recovery
+          ? "/auth/reset"
+          : "/projects",
+      req.url,
+    ),
   );
 }

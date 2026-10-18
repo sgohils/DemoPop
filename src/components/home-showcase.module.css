@@ -1,0 +1,395 @@
+.showcase {
+  display: grid;
+  grid-template-columns: minmax(0, 1.75fr) minmax(280px, 0.8fr);
+  border: 1px solid #30343f;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #171920;
+  color: #eff0f6;
+}
+.playerSide {
+  min-width: 0;
+  border-right: 1px solid #30343f;
+}
+.canvasHeader {
+  height: 65px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 0 24px;
+  border-bottom: 1px solid #292e39;
+}
+.canvasHeader > span {
+  font-family: ui-monospace, monospace;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 8px;
+  letter-spacing: 0.07em;
+  color: #8993ab;
+}
+.canvasHeader > span > i {
+  width: 4px;
+  height: 4px;
+  background: #dfff86;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #dfff8644;
+}
+.formatToggle {
+  display: flex;
+  gap: 5px;
+}
+.formatToggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  color: #737e96;
+  padding: 8px 9px;
+  border-radius: 4px;
+}
+.formatToggle button[aria-pressed="true"] {
+  background: #2c3347;
+  color: #d4defb;
+}
+.canvas {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 70px 34px 35px;
+  min-height: 480px;
+  isolation: isolate;
+  overflow: hidden;
+}
+.canvasGrid {
+  z-index: -1;
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 50% 40%, #596ba014, transparent 65%),
+    linear-gradient(#8f9cc205 1px, transparent 1px),
+    linear-gradient(90deg, #8f9cc205 1px, transparent 1px);
+  background-size:
+    auto,
+    28px 28px,
+    28px 28px;
+}
+.canvasNote {
+  position: absolute;
+  top: 27px;
+  left: 28px;
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.1em;
+  color: #606e8b;
+}
+.landscape :global(.preview-unit.landscape) {
+  width: 100%;
+  max-width: 740px;
+}
+.portrait :global(.preview-unit.vertical) {
+  width: 190px;
+}
+.canvas :global(.video-shell) {
+  border-radius: 5px;
+  box-shadow: 0 15px 35px #00000066;
+  border: 1px solid #43495d;
+}
+.canvas :global(.transport) {
+  margin-top: 16px;
+  color: #9faac1;
+  background: #202635;
+  border: 1px solid #344057;
+  border-radius: 5px;
+  padding: 0 12px;
+  height: 41px;
+  gap: 10px;
+}
+.canvas :global(.transport input) {
+  accent-color: #acbbff;
+}
+.canvas :global(.transport .play-button) {
+  background: #5268ce;
+}
+.canvas :global(.transport > span) {
+  color: #9aa9c6;
+  font-size: 8px;
+}
+.canvas :global(.transport > span b) {
+  color: #66748e;
+}
+.canvas :global(.transport svg) {
+  width: 14px;
+  height: 14px;
+}
+.canvasFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid #292e39;
+  gap: 15px;
+  min-height: 48px;
+  padding: 14px 24px;
+  font-size: 8px;
+  color: #8692ac;
+}
+.canvasFooter > span:first-child {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.canvasFooter > span:last-child {
+  font-size: 6px;
+  letter-spacing: 0.08em;
+  color: #58667f;
+}
+.directionSide {
+  padding: 26px 25px;
+  display: flex;
+  flex-direction: column;
+}
+.directionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 15px;
+  font-family: ui-monospace, monospace;
+  font-size: 7px;
+  letter-spacing: 0.07em;
+  color: #7d89a1;
+  margin-bottom: 22px;
+}
+.directionHeading > span:last-child {
+  color: #4f5b75;
+}
+.templatePicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.styleButton.styleButton {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 14px;
+  border: 1px solid #2c3341;
+  border-radius: 5px;
+  text-align: left;
+  color: #a6b1c9;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease,
+    transform 200ms ease;
+}
+.styleButton.styleButton:hover {
+  transform: translateX(3px);
+  border-color: #5b6c92;
+  background: #202737;
+}
+.styleButton.styleButton[aria-pressed="true"] {
+  background: #252f47;
+  border-color: #6275a7;
+  color: #eef3ff;
+}
+.styleNumber {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  color: #5c6b88;
+}
+.styleButton > span:nth-child(2) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.styleButton strong {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+.styleButton small {
+  font-size: 6px;
+  letter-spacing: 0.09em;
+  color: #667798;
+}
+.styleIndicator {
+  margin-left: auto;
+  color: #667999;
+}
+.styleButton[aria-pressed="true"] .styleIndicator {
+  color: #dfff86;
+}
+.selectionDescription {
+  font-size: 11px;
+  color: #7f8ca6;
+  line-height: 1.8;
+  min-height: 40px;
+  margin: 24px 0 21px;
+}
+.useStyle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border-radius: 5px;
+  color: #19230d;
+  background: #dfff86;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: auto;
+  transition: background 200ms ease;
+}
+.useStyle:hover {
+  background: #e8ffaa;
+}
+.hint {
+  font-size: 8px;
+  color: #63718d;
+  line-height: 1.8;
+  margin-top: 15px;
+}
+@media (max-width: 1050px) {
+  .showcase {
+    grid-template-columns: minmax(0, 1.4fr) minmax(245px, 0.8fr);
+  }
+  .directionSide {
+    padding: 25px 19px;
+  }
+  .styleButton.styleButton {
+    gap: 10px;
+    padding: 17px 12px;
+  }
+  .styleButton strong {
+    font-size: 12px;
+  }
+  .directionHeading {
+    font-size: 6px;
+  }
+  .canvas {
+    padding: 70px 23px 30px;
+    min-height: 480px;
+  }
+  .portrait :global(.preview-unit.vertical) {
+    width: 178px;
+  }
+  .canvasFooter > span:last-child {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .showcase {
+    grid-template-columns: 1fr;
+  }
+  .playerSide {
+    border-right: 0;
+    border-bottom: 1px solid #30343f;
+  }
+  .canvasHeader {
+    height: 58px;
+    padding: 0 16px;
+  }
+  .canvasHeader > span {
+    font-size: 6px;
+    letter-spacing: 0.06em;
+  }
+  .formatToggle button {
+    font-size: 8px;
+    padding: 7px 8px;
+  }
+  .canvas {
+    min-height: 315px;
+    padding: 55px 18px 24px;
+  }
+  .canvasNote {
+    top: 22px;
+    left: 18px;
+    font-size: 6px;
+  }
+  .portrait {
+    min-height: 380px;
+  }
+  .portrait :global(.preview-unit.vertical) {
+    width: 145px;
+  }
+  .portrait :global(.transport) {
+    margin-left: -10px;
+    margin-right: -10px;
+    width: calc(100% + 20px);
+    padding: 0 7px;
+    gap: 7px;
+  }
+  .canvas :global(.transport) {
+    height: 35px;
+    margin-top: 12px;
+  }
+  .canvas :global(.transport > span) {
+    font-size: 7px;
+  }
+  .canvas :global(.transport svg) {
+    width: 12px;
+    height: 12px;
+  }
+  .canvasFooter {
+    padding: 12px 17px;
+    min-height: 42px;
+    font-size: 7px;
+  }
+  .canvasFooter > span:last-child {
+    display: block;
+    font-size: 5px;
+  }
+  .directionSide {
+    padding: 22px 18px;
+  }
+  .directionHeading {
+    font-size: 6px;
+    margin-bottom: 17px;
+  }
+  .templatePicker {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .styleButton.styleButton {
+    padding: 14px 9px;
+    gap: 8px;
+  }
+  .styleButton strong {
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .styleButton small {
+    font-size: 4px;
+    letter-spacing: 0.06em;
+  }
+  .styleIndicator svg {
+    width: 10px;
+    height: 10px;
+  }
+  .styleNumber {
+    font-size: 7px;
+  }
+  .selectionDescription {
+    font-size: 10px;
+    margin: 20px 0 18px;
+    min-height: 18px;
+  }
+  .useStyle {
+    padding: 14px 16px;
+    font-size: 10px;
+  }
+  .hint {
+    font-size: 7px;
+    line-height: 1.7;
+    margin-top: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .showcase * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

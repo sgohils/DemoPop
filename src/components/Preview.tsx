@@ -1,21 +1,81 @@
 "use client";
 import { Player, type PlayerRef } from "@remotion/player";
 import { useRef, useState, useEffect } from "react";
-import { Play, Pause, RotateCcw, Maximize } from "lucide-react";
-import { Reveal } from "../video/Reveal";
-import { VIDEO, type VideoProps } from "../shared/project";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Maximize,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
+import { Showcase } from "../video/Showcase";
+import { videoScenes } from "../shared/scenes";
+import {
+  VIDEO,
+  FONTS,
+  videoSettings,
+  type VideoProps,
+} from "../shared/project";
 export function Preview({
   input,
   compact = false,
+  onRetry,
+  scenes = false,
+  focusFrame,
+  pauseWhenOffscreen = false,
 }: {
   input: VideoProps;
   compact?: boolean;
+  onRetry?: () => void;
+  scenes?: boolean;
+  focusFrame?: { frame: number; request: number };
+  pauseWhenOffscreen?: boolean;
 }) {
   const ref = useRef<PlayerRef>(null);
-  const [frame, setFrame] = useState(210);
+  const surface = useRef<HTMLDivElement>(null);
+  const initialFrame = input.project.template === "launch" ? 217 : 250;
+  const [frame, setFrame] = useState(initialFrame);
+  const [muted, setMuted] = useState(false);
+  const poster = useRef(true);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState("");
+  const [retryCount, setRetryCount] = useState(0);
+  const dimensions = videoSettings(input.project);
+  const handledSceneRequest = useRef<number | undefined>(undefined);
+  const timeline = videoScenes(input.project.template);
+  const activeScene = timeline.findIndex(
+    (scene) => frame >= scene.start && frame < scene.end,
+  );
+  useEffect(() => {
+    const element = surface.current;
+    if (!pauseWhenOffscreen || !element) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) ref.current?.pause();
+    });
+    const visibility = () => {
+      if (document.hidden) ref.current?.pause();
+    };
+    observer.observe(element);
+    document.addEventListener("visibilitychange", visibility);
+    return () => {
+      observer.disconnect();
+      document.removeEventListener("visibilitychange", visibility);
+    };
+  }, [pauseWhenOffscreen]);
+  useEffect(() => {
+    if (
+      !focusFrame ||
+      !ready ||
+      handledSceneRequest.current === focusFrame.request
+    )
+      return;
+    handledSceneRequest.current = focusFrame.request;
+    poster.current = false;
+    ref.current?.pause();
+    ref.current?.seekTo(focusFrame.frame);
+  }, [focusFrame, ready]);
   useEffect(() => {
     let live = true;
     setReady(false);
@@ -33,13 +93,13 @@ export function Preview({
             img.onerror = () =>
               reject(
                 new Error(
-                  "A preview image could not load. Reopen the project to refresh private image access.",
+                  "A preview image could not load. Retry image access without losing your edits.",
                 ),
               );
             img.src = src;
           }),
       ),
-      document.fonts.load("600 16px Manrope"),
+      document.fonts.load(`600 16px "${FONTS[input.project.font].name}"`),
     ])
       .then(() => {
         if (live) setReady(true);
@@ -50,7 +110,13 @@ export function Preview({
     return () => {
       live = false;
     };
-  }, [input.before.src, input.after.src, input.logo?.src]);
+  }, [
+    input.before.src,
+    input.after.src,
+    input.logo?.src,
+    input.project.font,
+    retryCount,
+  ]);
   useEffect(() => {
     const player = ref.current;
     if (!player) return;
@@ -69,19 +135,43 @@ export function Preview({
       player.removeEventListener("ended", pause);
     };
   }, []);
+  function togglePlayback() {
+    if (!playing && (poster.current || frame >= VIDEO.durationInFrames - 1)) {
+      ref.current?.seekTo(0);
+    }
+    poster.current = false;
+    ref.current?.toggle();
+  }
   return (
-    <div className={`preview-unit ${compact ? "compact" : ""}`}>
+    <div
+      ref={surface}
+      className={`preview-unit ${compact ? "compact" : ""} ${input.project.format}`}
+      tabIndex={scenes ? 0 : undefined}
+      aria-label={
+        scenes ? "Video preview. Press Space to play or pause." : undefined
+      }
+      onKeyDown={(event) => {
+        if (
+          event.code === "Space" &&
+          event.target === event.currentTarget &&
+          ready
+        ) {
+          event.preventDefault();
+          togglePlayback();
+        }
+      }}
+    >
       <div className="video-shell">
         <Player
           ref={ref}
-          component={Reveal}
+          component={Showcase}
           inputProps={input}
           durationInFrames={VIDEO.durationInFrames}
           fps={VIDEO.fps}
-          compositionWidth={VIDEO.width}
-          compositionHeight={VIDEO.height}
+          compositionWidth={dimensions.width}
+          compositionHeight={dimensions.height}
           style={{ width: "100%", height: "100%" }}
-          initialFrame={210}
+          initialFrame={initialFrame}
           clickToPlay={false}
           controls={false}
           loop={false}
@@ -89,7 +179,20 @@ export function Preview({
         />
         {!ready && (
           <div className="preview-loading" role={error ? "alert" : "status"}>
-            {error || "Loading your preview…"}
+            <div>
+              {error || "Loading your preview…"}
+              {error && (
+                <button
+                  className="button secondary small"
+                  onClick={() => {
+                    onRetry?.();
+                    setRetryCount((value) => value + 1);
+                  }}
+                >
+                  Retry preview
+                </button>
+              )}
+            </div>
           </div>
         )}
         <button
@@ -105,6 +208,7 @@ export function Preview({
         <button
           disabled={!ready}
           onClick={() => {
+            poster.current = false;
             ref.current?.seekTo(0);
             ref.current?.pause();
           }}
@@ -115,7 +219,7 @@ export function Preview({
         <button
           disabled={!ready}
           className="play-button"
-          onClick={() => ref.current?.toggle()}
+          onClick={togglePlayback}
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (
@@ -132,6 +236,7 @@ export function Preview({
           max={449}
           value={frame}
           onChange={(e) => {
+            poster.current = false;
             ref.current?.pause();
             ref.current?.seekTo(Number(e.target.value));
           }}
@@ -139,7 +244,58 @@ export function Preview({
         <span>
           {(frame / 30).toFixed(1)} <b>/ 15s</b>
         </span>
+        {input.project.template === "launch" &&
+          input.project.sound === "pulse" && (
+            <button
+              aria-label={muted ? "Unmute preview" : "Mute preview"}
+              title="Preview volume only; exports use the soundtrack setting"
+              disabled={!ready}
+              onClick={() => {
+                if (muted) ref.current?.unmute();
+                else ref.current?.mute();
+                setMuted(!muted);
+              }}
+            >
+              {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
+            </button>
+          )}
       </div>
+      {scenes && (
+        <div className="story-timeline" aria-label="Video scenes">
+          <div className="timeline-heading">
+            <span>Your story</span>
+            <span>
+              {timeline[activeScene]?.name || "Closing"} <b>· 15 seconds</b>
+            </span>
+          </div>
+          <div className="scene-track">
+            {timeline.map((scene, index) => (
+              <button
+                key={scene.name}
+                disabled={!ready}
+                aria-label={`Jump to ${scene.name}`}
+                aria-pressed={index === activeScene}
+                onClick={() => {
+                  poster.current = false;
+                  ref.current?.pause();
+                  ref.current?.seekTo(scene.preview);
+                }}
+              >
+                <span
+                  className={`scene-art scene-art-${index}`}
+                  aria-hidden="true"
+                >
+                  <i />
+                  <i />
+                  <i />
+                </span>
+                <span className="scene-name">{scene.name}</span>
+                <span className="scene-time">{scene.start / 30}s</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

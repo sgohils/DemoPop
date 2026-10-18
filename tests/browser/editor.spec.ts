@@ -7,8 +7,9 @@ test("sample preview and desktop editor really play, scrub and update", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /Good redesigns/ }),
+    page.getByRole("heading", { name: /You built it/ }),
   ).toBeVisible();
+  await page.locator("#styles").scrollIntoViewIfNeeded();
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),
   ).toBeEnabled();
@@ -23,9 +24,14 @@ test("sample preview and desktop editor really play, scrub and update", async ({
         await page.getByRole("slider", { name: "Video position" }).inputValue(),
       ),
     )
-    .toBeGreaterThan(220);
+    .toBeGreaterThan(5);
+  expect(
+    Number(
+      await page.getByRole("slider", { name: "Video position" }).inputValue(),
+    ),
+  ).toBeLessThan(200);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("link", { name: "Create a video", exact: true }).click();
+  await page.getByRole("link", { name: "Open studio", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "The details" }),
   ).toBeVisible();
@@ -46,7 +52,9 @@ test("sample preview and desktop editor really play, scrub and update", async ({
     page.getByText("Beautifully considered.", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Choose brand color").fill("#884433");
-  await expect(page.getByText("#884433")).toBeVisible();
+  await expect(
+    page.getByRole("textbox", { name: "Hex brand color", exact: true }),
+  ).toHaveValue("#884433");
   await page.getByRole("button", { name: "Position & zoom" }).first().click();
   await page.getByLabel("Zoom").first().fill("1.3");
   await page.getByRole("button", { name: "Restart", exact: true }).click();
@@ -64,7 +72,7 @@ test("sample preview and desktop editor really play, scrub and update", async ({
   await page.getByRole("button", { name: "Pause", exact: true }).click();
   await page.getByRole("slider", { name: "Video position" }).fill("300");
   await expect(
-    page.getByText("A clearer path to getting in touch.", { exact: true }),
+    page.getByText("Less setup. More momentum.", { exact: true }),
   ).toBeVisible();
   await page
     .getByLabel("Upload after screenshot")
@@ -75,7 +83,7 @@ test("sample preview and desktop editor really play, scrub and update", async ({
     mimeType: "image/png",
     buffer: Buffer.from("not a real image"),
   });
-  await expect(page.getByRole("alert")).toBeVisible();
+  await expect(page.locator(".editor-message[role='alert']")).toBeVisible();
   await page.screenshot({ path: "out/qa/editor-desktop.png", fullPage: true });
   expect(errors).toEqual([]);
 });
@@ -104,6 +112,23 @@ test("mobile preview and settings remain usable without horizontal overflow", as
   await page
     .getByLabel("Closing URL text")
     .fill("example.com/" + "a".repeat(68));
+  await page.getByLabel("Upload before screenshot").setInputFiles({
+    name: "corrupt.png",
+    mimeType: "image/png",
+    buffer: Buffer.from("not a real image"),
+  });
+  const error = page.locator(".editor-message[role='alert']");
+  await expect(error).toBeVisible();
+  await expect(error).not.toBeEmpty();
+  await expect(
+    page.getByRole("button", { name: "Settings", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.screenshot({
+    path: "out/qa/editor-mobile-error.png",
+    fullPage: true,
+  });
+  await page.getByRole("button", { name: "Dismiss error" }).click();
+  await expect(error).toHaveCount(0);
   await page.screenshot({
     path: "out/qa/editor-mobile-settings.png",
     fullPage: true,

@@ -3,9 +3,10 @@ import { z } from "zod";
 import {
   projectSchema,
   MAX_UPLOAD,
-  sampleMedia,
+  sampleAsset,
   type Media,
   type ProjectInput,
+  brandKitSchema,
 } from "../../../shared/project";
 import {
   adminClient,
@@ -53,6 +54,43 @@ async function handle(
     const [kind, id, action] = segments;
     const supabase = await userClient();
     if (kind === "auth" && req.method === "POST") {
+      if (id === "recover") {
+        const body = z
+          .object({ email: z.email().max(254) })
+          .strict()
+          .parse(await req.json());
+        const result = await supabase.auth.resetPasswordForEmail(body.email, {
+          redirectTo: `${req.nextUrl.origin}/auth/confirm?next=/auth/reset`,
+        });
+        if (result.error)
+          throw new HttpError(
+            result.error.status === 429 ? 429 : 503,
+            "A recovery email could not be requested right now. Please try again later.",
+          );
+        return NextResponse.json({
+          message:
+            "If an account exists for that email, a recovery link will arrive shortly.",
+        });
+      }
+      if (id === "password") {
+        const body = z
+          .object({ password: z.string().min(8).max(128) })
+          .strict()
+          .parse(await req.json());
+        const identity = await supabase.auth.getUser();
+        if (identity.error || !identity.data.user)
+          throw new HttpError(
+            401,
+            "Open a valid recovery link before changing your password.",
+          );
+        const result = await supabase.auth.updateUser(body);
+        if (result.error)
+          throw new HttpError(
+            400,
+            "The password could not be updated. Use a fresh recovery link and try again.",
+          );
+        return NextResponse.json({ ok: true });
+      }
       if (id === "logout") {
         const { error } = await supabase.auth.signOut();
         check(error);
@@ -80,6 +118,7 @@ async function handle(
       if (result.error) throw new HttpError(400, result.error.message);
       return NextResponse.json({
         signedIn: Boolean(result.data.session),
+        userId: result.data.session ? result.data.user?.id : undefined,
         message: result.data.session
           ? "Signed in."
           : "Check your email to confirm your account, then sign in.",
@@ -90,6 +129,8 @@ async function handle(
       error: authError,
     } = await supabase.auth.getUser();
     if (authError || !user) throw new HttpError(401, "Sign in to continue.");
+    if (kind === "session" && !id && req.method === "GET")
+      return NextResponse.json({ signedIn: true, userId: user.id });
     const owner = user.id;
     const admin = adminClient();
     async function limit(key: string, max: number, seconds = 3600) {
@@ -107,7 +148,7 @@ async function handle(
       for (const assetId of [p.before, p.after, p.logo].filter(
         Boolean,
       ) as string[]) {
-        if (assetId.startsWith("sample-")) continue;
+        if (sampleAsset(assetId)) continue;
         const { data, error } = await supabase
           .from("assets")
           .select("*")
@@ -118,9 +159,8 @@ async function handle(
       }
     }
     async function resolveAsset(assetId: string): Promise<Media> {
-      const sample = sampleMedia();
-      if (assetId === "sample-before") return sample.before;
-      if (assetId === "sample-after") return sample.after;
+      const sample = sampleAsset(assetId);
+      if (sample) return sample;
       const { data, error } = await supabase
         .from("assets")
         .select("*")
@@ -140,14 +180,89 @@ async function handle(
         height: asset.height,
       };
     }
+    if (kind === "brand-kits") {
+      if (!id && req.method === "GET") {
+        const result = await supabase
+          .from("brand_kits")
+          .select("id,settings,updated_at")
+          .order("updated_at", { ascending: false });
+        check(result.error);
+        return NextResponse.json({
+          kits: (result.data || []).map((kit) => ({
+            id: kit.id,
+            ...brandKitSchema.parse(kit.settings),
+            updated_at: kit.updated_at,
+          })),
+        });
+      }
+      if (id) {
+        const found = await supabase
+          .from("brand_kits")
+          .select("*")
+          .eq("id", uuid(id))
+          .maybeSingle();
+        check(found.error);
+        owned(found.data, owner);
+        if (req.method === "DELETE") {
+          await limit("brand-kit", 30);
+          check(
+            (
+              await admin
+                .from("brand_kits")
+                .delete()
+                .eq("id", id)
+                .eq("owner_id", owner)
+            ).error,
+          );
+          return NextResponse.json({ ok: true });
+        }
+      }
+      if ((!id && req.method === "POST") || (id && req.method === "PUT")) {
+        await limit("brand-kit", 30);
+        const kit = brandKitSchema.parse(await req.json());
+        if (kit.logo) await resolveAsset(kit.logo);
+        const record = {
+          owner_id: owner,
+          name: kit.name,
+          settings: kit,
+          logo_asset: kit.logo,
+        };
+        const result = id
+          ? await admin
+              .from("brand_kits")
+              .update(record)
+              .eq("id", id)
+              .eq("owner_id", owner)
+              .select("id")
+              .single()
+          : await admin.from("brand_kits").insert(record).select("id").single();
+        check(result.error);
+        return NextResponse.json({ id: result.data!.id });
+      }
+    }
     if (kind === "projects") {
       if (!id && req.method === "GET") {
-        const { data, error } = await supabase
+        let query = supabase
           .from("projects")
-          .select("id,name,updated_at")
-          .order("updated_at", { ascending: false });
+          .select("id,name,updated_at,deleted_at,settings")
+          .order("updated_at", { ascending: false })
+          .limit(200);
+        query =
+          req.nextUrl.searchParams.get("trash") === "1"
+            ? query.not("deleted_at", "is", null)
+            : query.is("deleted_at", null);
+        const { data, error } = await query;
         check(error);
-        return NextResponse.json({ projects: data });
+        return NextResponse.json({
+          projects: (data || []).map((p) => ({
+            id: p.id,
+            name: p.name,
+            updated_at: p.updated_at,
+            deleted_at: p.deleted_at,
+            template: projectSchema.parse(p.settings).template,
+            format: projectSchema.parse(p.settings).format,
+          })),
+        });
       }
       if (!id && req.method === "POST") {
         await limit("create", 20);
@@ -176,11 +291,72 @@ async function handle(
         .maybeSingle();
       check(error);
       const project = owned(data, owner);
+      if (
+        req.method === "POST" &&
+        ["duplicate", "trash", "restore"].includes(action)
+      ) {
+        await limit(
+          action === "duplicate" ? "create" : "manage-project",
+          action === "duplicate" ? 20 : 60,
+        );
+        const result = await admin.rpc("manage_project", {
+          p_owner: owner,
+          p_project: projectId,
+          p_action: action,
+        });
+        if (result.error?.message.includes("Active export"))
+          throw new HttpError(
+            409,
+            "Wait for the active export to finish before moving this project to trash.",
+          );
+        if (result.error?.message.includes("Not found"))
+          throw new HttpError(404, "Not found.");
+        check(result.error);
+        return NextResponse.json({ id: result.data });
+      }
+      if (project.deleted_at)
+        throw new HttpError(
+          404,
+          "This project is in the trash. Restore it from Projects.",
+        );
+      if (action === "exports" && req.method === "GET") {
+        const offset = z.coerce
+          .number()
+          .int()
+          .min(0)
+          .max(10000)
+          .parse(req.nextUrl.searchParams.get("offset") || 0);
+        const result = await supabase
+          .from("render_jobs")
+          .select(
+            "id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at",
+          )
+          .eq("project_id", projectId)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(offset, offset + 20);
+        check(result.error);
+        const jobs = (result.data || []).slice(0, 20).map((job) => {
+          const snapshot = projectSchema.parse(job.snapshot);
+          return {
+            ...job,
+            snapshot: undefined,
+            format: snapshot.format,
+            template: snapshot.template,
+          };
+        });
+        return NextResponse.json({
+          jobs,
+          hasMore: (result.data?.length || 0) > 20,
+        });
+      }
       if (req.method === "GET") {
         const p = projectSchema.parse(project.settings);
         const latest = await supabase
           .from("render_jobs")
-          .select("id,status,progress,attempt_count,error")
+          .select(
+            "id,status,progress,attempt_count,error,snapshot,output_expired_at",
+          )
           .eq("project_id", projectId)
           .order("created_at", { ascending: false })
           .limit(1)
@@ -188,7 +364,14 @@ async function handle(
         check(latest.error);
         return NextResponse.json({
           project: p,
-          job: latest.data,
+          job: latest.data
+            ? {
+                ...latest.data,
+                snapshot: undefined,
+                format: projectSchema.parse(latest.data.snapshot).format,
+                template: projectSchema.parse(latest.data.snapshot).template,
+              }
+            : null,
           media: {
             before: await resolveAsset(p.before),
             after: await resolveAsset(p.after),
@@ -282,7 +465,7 @@ async function handle(
         .maybeSingle();
       check(row.error);
       owned(row.data, owner);
-      const result = await admin.rpc("enqueue_render", {
+      const result = await admin.rpc("enqueue_render_with_result", {
         p_owner: owner,
         p_project: body.projectId,
         p_settings: body.project,
@@ -296,19 +479,34 @@ async function handle(
           );
         check(result.error);
       }
-      return NextResponse.json({ id: result.data });
+      const queued = z
+        .object({ id: z.uuid(), reused: z.boolean() })
+        .safeParse(result.data);
+      if (!queued.success)
+        throw new HttpError(
+          500,
+          "The export could not be confirmed. Please retry.",
+        );
+      return NextResponse.json(queued.data);
     }
     if (kind === "jobs" && id) {
       const jobId = uuid(id);
       const result = await supabase
         .from("render_jobs")
         .select(
-          "id,owner_id,project_id,status,progress,attempt_count,error,created_at",
+          "id,owner_id,project_id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at",
         )
         .eq("id", jobId)
         .maybeSingle();
       check(result.error);
-      const job = owned(result.data, owner);
+      const row = owned(result.data, owner);
+      const snapshot = projectSchema.parse(row.snapshot);
+      const job = {
+        ...row,
+        snapshot: undefined,
+        format: snapshot.format,
+        template: snapshot.template,
+      };
       if (action === "retry" && req.method === "POST") {
         await limit("retry", 10);
         const retried = await admin.rpc("retry_render", {
@@ -333,6 +531,11 @@ async function handle(
           .single();
         check(output.error);
         const path = output.data!.output_path;
+        if (!path)
+          throw new HttpError(
+            410,
+            "This export has expired. Create a new export from the project.",
+          );
         if (!safeStoragePath(owner, path))
           throw new HttpError(404, "Not found.");
         const signed = await admin.storage
@@ -374,4 +577,4 @@ async function route(
   response.headers.set("X-Content-Type-Options", "nosniff");
   return response;
 }
-export { route as GET, route as POST, route as PUT };
+export { route as GET, route as POST, route as PUT, route as DELETE };

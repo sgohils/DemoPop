@@ -1,5 +1,8 @@
 node_modules
 .next
+.next-browser
+.next-browser-cloud-ui
+.next-preview
 .npm-cache
 .git
 out

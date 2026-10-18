@@ -15,56 +15,123 @@ import {
   Save,
   Film,
   AlertCircle,
+  Undo2,
+  Redo2,
+  ArrowLeftRight,
 } from "lucide-react";
+import "./editor.css";
 import { Brand } from "./Brand";
 import { Preview } from "./Preview";
+import { EditorSignIn } from "./EditorSignIn";
+import { useUnsavedChanges } from "./NavigationGuard";
+import { createMediaRefresher } from "../shared/private-media";
+import { BrandKits } from "./BrandKits";
+import { DraftRecovery } from "./DraftRecovery";
+import { ExportHistory, type HistoryJob } from "./ExportHistory";
+import { removeDraft, type Draft, type DraftAssets } from "../client/drafts";
+import { useProjectHistory } from "../client/use-project-history";
+import { BrandColor } from "./BrandColor";
+import { MotionControls } from "./MotionControls";
 import {
   sampleProject,
   sampleMedia,
+  sampleAsset,
+  SAMPLE_ASSETS,
+  newProject,
   projectSchema,
   defaultCrop,
   MAX_UPLOAD,
   type ProjectInput,
   type VideoProps,
   type Media,
+  type BrandKitInput,
+  TEMPLATES,
+  FONTS,
+  videoSettings,
 } from "../shared/project";
-type Job = {
-  id: string;
-  status: "queued" | "rendering" | "completed" | "failed";
-  progress: number;
-  attempt_count: number;
-  error: string | null;
-};
-async function api(url: string, method = "GET", body?: unknown) {
+import { videoScenes } from "../shared/scenes";
+type Job = HistoryJob;
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+async function api(
+  url: string,
+  method = "GET",
+  body?: unknown,
+  signal?: AbortSignal,
+) {
   const r = await fetch(`/api/${url}`, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
     body: body ? JSON.stringify(body) : undefined,
     cache: "no-store",
+    signal,
   });
   const data = await r.json();
-  if (!r.ok) throw new Error(data.error || "Please retry.");
+  if (!r.ok) throw new ApiError(data.error || "Please retry.", r.status);
   return data;
 }
 export function Editor({
   initialId,
   configured,
+  initialStyle,
 }: {
   initialId: string;
   configured: boolean;
+  initialStyle?: {
+    template?: ProjectInput["template"];
+    format?: ProjectInput["format"];
+  };
 }) {
-  const [project, setProject] = useState<ProjectInput>(sampleProject);
-  const [media, setMedia] = useState(sampleMedia());
+  const initialProject = useRef(
+    initialId === "new" ? newProject(initialStyle) : sampleProject,
+  ).current;
+  const history = useProjectHistory(initialProject);
+  const { project, setProject, reset: resetProject } = history;
+  const [media, setMedia] = useState(() => ({
+    before: sampleAsset(initialProject.before)!,
+    after: sampleAsset(initialProject.after)!,
+    logo: null as Media | null,
+  }));
+  const assetCatalog = useRef(
+    new Map<string, Media>(
+      Object.keys(SAMPLE_ASSETS).map((asset) => [asset, sampleAsset(asset)!]),
+    ),
+  );
+  const [focusFrame, setFocusFrame] = useState<{
+    frame: number;
+    request: number;
+  }>();
+  const [dragging, setDragging] = useState<string | null>(null);
   const [id, setId] = useState(initialId === "new" ? null : initialId);
   const [saved, setSaved] = useState(
     initialId === "new" ? "" : JSON.stringify(sampleProject),
   );
   const [loading, setLoading] = useState(initialId !== "new");
   const [loadError, setLoadError] = useState("");
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [localAssets, setLocalAssets] = useState<DraftAssets>({});
   const [saving, setSaving] = useState(false),
     [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [authenticated, setAuthenticated] = useState<boolean | null>(
+    configured ? null : false,
+  );
+  const [refreshError, setRefreshError] = useState("");
+  const refreshMedia = useRef<() => Promise<void>>(async () => {});
+  const sessionVersion = useRef(0);
+  const authEpoch = useRef(0);
+  const authenticatedRef = useRef(authenticated);
+  authenticatedRef.current = authenticated;
+  const [mediaVersion, setMediaVersion] = useState(0);
+  const loadedId = useRef<string | null>(null);
   const [uploading, setUploading] = useState<string | null>(null);
   const [mobile, setMobile] = useState<"preview" | "settings">("preview");
   const [cropOpen, setCropOpen] = useState<string | null>(null);
@@ -75,8 +142,126 @@ export function Editor({
   const objectUrls = useRef<string[]>([]);
   const modalRef = useRef<HTMLElement>(null);
   const dirty = JSON.stringify(project) !== saved;
-  const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  const draftDirty =
+    dirty &&
+    (!!id || JSON.stringify(project) !== JSON.stringify(initialProject));
+  const dimensions = videoSettings(project);
+  const draftScope = configured ? userId : "local";
+  const projectRef = useRef(project);
+  projectRef.current = project;
+  useEffect(() => {
+    assetCatalog.current.set(project.before, media.before);
+    assetCatalog.current.set(project.after, media.after);
+    if (project.logo && media.logo)
+      assetCatalog.current.set(project.logo, media.logo);
+  }, [project.before, project.after, project.logo, media]);
+  function moveHistory(direction: "undo" | "redo") {
+    const target = direction === "undo" ? history.previous : history.next;
+    if (!target || uploading || saving || exporting) return;
+    setMedia({
+      before: assetCatalog.current.get(target.before) || media.before,
+      after: assetCatalog.current.get(target.after) || media.after,
+      logo: target.logo ? assetCatalog.current.get(target.logo) || null : null,
+    });
+    history[direction]();
+    setNotice("");
+  }
+  useEffect(() => {
+    const keydown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement;
+      if (
+        target.closest(
+          "input,textarea,select,[contenteditable='true'],[role='dialog']",
+        )
+      )
+        return;
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        event.key.toLowerCase() === "z"
+      ) {
+        event.preventDefault();
+        moveHistory(event.shiftKey ? "redo" : "undo");
+      }
+    };
+    window.addEventListener("keydown", keydown);
+    return () => window.removeEventListener("keydown", keydown);
+  });
+  function showScene(name: string) {
+    const frame =
+      videoScenes(project.template).find((scene) => scene.name === name)
+        ?.preview || 0;
+    setFocusFrame((value) => ({ frame, request: (value?.request || 0) + 1 }));
+  }
+  useUnsavedChanges(!loading && !loadError && draftDirty);
+  function handleAuthFailure(failure: unknown, epoch: number) {
+    if (
+      epoch === authEpoch.current &&
+      failure instanceof ApiError &&
+      failure.status === 401
+    ) {
+      sessionVersion.current++;
+      setAuthenticated(false);
+      setJobPanel(false);
+    }
+  }
+  function reportFailure(failure: unknown, epoch = authEpoch.current) {
+    if (epoch !== authEpoch.current) return;
+    handleAuthFailure(failure, epoch);
+    setError((failure as Error).message);
+  }
+  function signedIn() {
+    sessionVersion.current++;
+    authEpoch.current++;
+    setAuthenticated(true);
+    setMediaVersion((version) => version + 1);
+    setLoadAttempt((attempt) => attempt + 1);
+    setError("");
+    setNotice(
+      "Signed in. Your edits are still here; save or export when ready.",
+    );
+    void api("session")
+      .then((identity) => setUserId(identity.userId || null))
+      .catch(() => {});
+  }
+  useEffect(() => {
+    if (!configured) return;
+    let live = true;
+    const checkSession = async () => {
+      const version = ++sessionVersion.current;
+      try {
+        const identity = await api("session");
+        if (live && version === sessionVersion.current) {
+          setUserId(identity.userId || null);
+          if (authenticatedRef.current !== true) {
+            authEpoch.current++;
+            setMediaVersion((value) => value + 1);
+            setLoadAttempt((attempt) => attempt + 1);
+          }
+          setAuthenticated(true);
+        }
+      } catch (failure) {
+        if (live && version === sessionVersion.current) {
+          setAuthenticated(false);
+          if (!(failure instanceof ApiError && failure.status === 401))
+            setError(
+              "Account status is temporarily unavailable. Sign in or try again.",
+            );
+        }
+      }
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") void checkSession();
+    };
+    void checkSession();
+    window.addEventListener("focus", checkSession);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", checkSession);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [configured]);
   useEffect(() => {
     if (!jobPanel) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -110,43 +295,39 @@ export function Editor({
     };
   }, [jobPanel]);
   useEffect(() => {
-    if (initialId === "new") return;
-    api(`projects/${initialId}`)
+    if (initialId === "new" || loadedId.current === initialId) return;
+    setLoading(true);
+    setLoadError("");
+    const epoch = authEpoch.current;
+    let live = true;
+    const controller = new AbortController();
+    api(`projects/${initialId}`, "GET", undefined, controller.signal)
       .then((data) => {
-        setProject(data.project);
+        if (!live) return;
+        loadedId.current = initialId;
+        setId(initialId);
+        resetProject(data.project);
         setMedia(data.media);
         setSaved(JSON.stringify(data.project));
         if (data.job) setJob(data.job);
       })
-      .catch((e) => setLoadError(e.message))
-      .finally(() => setLoading(false));
-  }, [initialId]);
+      .catch((e) => {
+        if (live) {
+          handleAuthFailure(e, epoch);
+          setLoadError(e.message);
+        }
+      })
+      .finally(() => {
+        if (live) setLoading(false);
+      });
+    return () => {
+      live = false;
+      controller.abort();
+    };
+  }, [initialId, loadAttempt, resetProject]);
   useEffect(() => {
     const urls = objectUrls.current;
-    const warn = (e: BeforeUnloadEvent) => {
-      if (dirtyRef.current) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    const nav = (e: MouseEvent) => {
-      const target = (e.target as HTMLElement).closest("a[href]");
-      if (
-        target &&
-        dirtyRef.current &&
-        !target.hasAttribute("download") &&
-        target.getAttribute("href")?.startsWith("/") &&
-        !window.confirm("You have unsaved edits. Leave this project?")
-      ) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", warn);
-    document.addEventListener("click", nav, true);
     return () => {
-      window.removeEventListener("beforeunload", warn);
-      document.removeEventListener("click", nav, true);
       for (const url of urls) URL.revokeObjectURL(url);
     };
   }, []);
@@ -154,6 +335,7 @@ export function Editor({
     if (!job || !["queued", "rendering"].includes(job.status)) return;
     let live = true;
     const poll = async () => {
+      const epoch = authEpoch.current;
       try {
         const data = await api(`jobs/${job.id}`);
         if (live) {
@@ -161,10 +343,12 @@ export function Editor({
           setJobError("");
         }
       } catch (e) {
-        if (live)
+        if (live) {
+          handleAuthFailure(e, epoch);
           setJobError(
             `Progress is temporarily unavailable. ${(e as Error).message}`,
           );
+        }
       }
     };
     void poll();
@@ -176,23 +360,108 @@ export function Editor({
   }, [job?.id, job?.status]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!configured) return;
-    const timer = setInterval(
-      () => {
-        for (const [key, asset] of [
-          ["before", project.before],
-          ["after", project.after],
-          ["logo", project.logo],
-        ] as const) {
-          if (asset && !asset.startsWith("sample-"))
-            api(`assets/${asset}`)
-              .then((value) => setMedia((m) => ({ ...m, [key]: value })))
-              .catch(() => {});
-        }
+    const epoch = authEpoch.current;
+    const refresher = createMediaRefresher({
+      assets: {
+        before: project.before,
+        after: project.after,
+        logo: project.logo,
       },
-      50 * 60 * 1000,
-    );
-    return () => clearInterval(timer);
-  }, [configured, project.before, project.after, project.logo]);
+      fetchMedia: (asset, signal) =>
+        api(`assets/${asset}`, "GET", undefined, signal),
+      onMedia: (key, asset, value) => {
+        if (projectRef.current[key] === asset)
+          setMedia((m) => ({ ...m, [key]: value }));
+      },
+      onError: (failure) => {
+        if (epoch !== authEpoch.current) return;
+        if (failure instanceof ApiError && failure.status === 401) {
+          sessionVersion.current++;
+          setAuthenticated(false);
+        }
+        setRefreshError(
+          "Image access could not be refreshed. Your edits are still here. Sign in if needed, then retry.",
+        );
+      },
+      onSuccess: () => setRefreshError(""),
+    });
+    refreshMedia.current = () => refresher.refresh();
+    const refresh = () => {
+      void refresher.refresh();
+    };
+    const visible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    const timer = setInterval(refresh, 50 * 60 * 1000);
+    if (mediaVersion > 0) refresh();
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      refresher.dispose();
+      clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [configured, project.before, project.after, project.logo, mediaVersion]);
+  async function restoreDraft(draft: Draft) {
+    try {
+      const restored = sampleMedia();
+      for (const key of ["before", "after", "logo"] as const) {
+        const asset = draft.project[key];
+        if (!asset) {
+          if (key === "logo") restored.logo = null;
+          continue;
+        }
+        const local = draft.assets[asset];
+        if (local) {
+          if (!(local.blob instanceof Blob) || local.blob.size > MAX_UPLOAD)
+            throw new Error("Draft image is invalid.");
+          const bitmap = await createImageBitmap(local.blob);
+          if (
+            bitmap.width < 64 ||
+            bitmap.height < 64 ||
+            bitmap.width * bitmap.height > 40_000_000
+          ) {
+            bitmap.close();
+            throw new Error("Draft image is invalid.");
+          }
+          const src = URL.createObjectURL(local.blob);
+          objectUrls.current.push(src);
+          restored[key] = { src, width: bitmap.width, height: bitmap.height };
+          bitmap.close();
+        } else if (sampleAsset(asset)) restored[key] = sampleAsset(asset)!;
+        else if (configured) restored[key] = await api(`assets/${asset}`);
+        else throw new Error("Draft image is unavailable.");
+      }
+      setLocalAssets(draft.assets);
+      setMedia(restored);
+      setProject(draft.project);
+      setNotice("Browser draft restored.");
+    } catch (failure) {
+      reportFailure(failure);
+      throw failure;
+    }
+  }
+  async function applyBrand(kit: BrandKitInput) {
+    try {
+      const logo = kit.logo ? await api(`assets/${kit.logo}`) : null;
+      setMedia((value) => ({ ...value, logo }));
+      setProject((value) => ({
+        ...value,
+        color: kit.color,
+        font: kit.font,
+        logo: kit.logo,
+        url: kit.url || value.url,
+      }));
+    } catch (failure) {
+      reportFailure(failure);
+      throw failure;
+    }
+  }
+  async function clearStoredDraft(previousId: string | null) {
+    if (draftScope)
+      await removeDraft(`${draftScope}:${previousId || "new"}`).catch(() => {});
+  }
   function update<K extends keyof ProjectInput>(
     key: K,
     value: ProjectInput[K],
@@ -211,30 +480,40 @@ export function Editor({
     return result.data;
   }
   async function save() {
+    const epoch = authEpoch.current;
     setSaving(true);
     setError("");
+    setNotice("");
     try {
       const p = validated();
       if (id) await api(`projects/${id}`, "PUT", p);
       else {
         const data = await api("projects", "POST", p);
         setId(data.id);
-        window.history.replaceState(null, "", `/editor/${data.id}`);
+        loadedId.current = data.id;
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `/editor/${data.id}`,
+        );
       }
       setProject((current) =>
         JSON.stringify(current) === JSON.stringify(project) ? p : current,
       );
       setSaved(JSON.stringify(p));
+      await clearStoredDraft(id);
       setNotice("Project saved.");
     } catch (e) {
-      setError((e as Error).message);
+      reportFailure(e, epoch);
     } finally {
       setSaving(false);
     }
   }
   async function startExport() {
+    const epoch = authEpoch.current;
     setExporting(true);
     setError("");
+    setNotice("");
     try {
       const p = validated();
       let projectId = id;
@@ -242,19 +521,29 @@ export function Editor({
         const data = await api("projects", "POST", p);
         projectId = data.id;
         setId(projectId);
-        window.history.replaceState(null, "", `/editor/${projectId}`);
+        loadedId.current = projectId;
+        window.history.replaceState(
+          window.history.state,
+          "",
+          `/editor/${projectId}`,
+        );
       }
       const data = await api("exports", "POST", { projectId, project: p });
       setProject((current) =>
         JSON.stringify(current) === JSON.stringify(project) ? p : current,
       );
       setSaved(JSON.stringify(p));
+      await clearStoredDraft(id);
       const current = await api(`jobs/${data.id}`);
       setJob(current.job);
       setJobPanel(true);
-      setNotice("Export started. Later edits apply to your next export.");
+      setNotice(
+        data.reused
+          ? "Showing the existing export with its earlier captured settings. Your submitted settings are saved for your next export."
+          : "Export started. Later edits apply to your next export.",
+      );
     } catch (e) {
-      setError((e as Error).message);
+      reportFailure(e, epoch);
     } finally {
       setExporting(false);
     }
@@ -264,8 +553,10 @@ export function Editor({
     file: File | undefined,
   ) {
     if (!file) return;
+    const epoch = authEpoch.current;
     setUploading(key);
     setError("");
+    setNotice("");
     try {
       if (file.size > MAX_UPLOAD)
         throw new Error("Choose an image smaller than 10 MB.");
@@ -279,7 +570,11 @@ export function Editor({
           body: file,
         });
         const data = await r.json();
-        if (!r.ok) throw new Error(data.error);
+        if (!r.ok)
+          throw new ApiError(
+            data.error || "Upload could not finish.",
+            r.status,
+          );
         next = data.media;
         assetId = data.id;
       } else {
@@ -299,8 +594,12 @@ export function Editor({
         next = { src, width: bitmap.width, height: bitmap.height };
         bitmap.close();
         assetId = crypto.randomUUID();
+        setLocalAssets((value) => ({
+          ...value,
+          [assetId]: { blob: file, width: next.width, height: next.height },
+        }));
         setNotice(
-          "Local preview only. Configure Supabase to upload, save, and export this image.",
+          "Local preview only. This image stays in your browser draft.",
         );
       }
       setMedia((m) => ({ ...m, [key]: next }));
@@ -310,16 +609,14 @@ export function Editor({
         ...(key !== "logo" ? { [`${key}Crop`]: { ...defaultCrop } } : {}),
       }));
     } catch (e) {
-      setError(
-        (e as Error).message ||
-          "This image could not be opened. Try a different file.",
-      );
+      reportFailure(e, epoch);
     } finally {
       setUploading(null);
     }
   }
   async function retry() {
     if (!job) return;
+    const epoch = authEpoch.current;
     setJobError("");
     setExporting(true);
     try {
@@ -328,6 +625,7 @@ export function Editor({
         j ? { ...j, status: "queued", progress: 0, error: null } : null,
       );
     } catch (e) {
+      handleAuthFailure(e, epoch);
       setJobError((e as Error).message);
     } finally {
       setExporting(false);
@@ -335,6 +633,7 @@ export function Editor({
   }
   async function download() {
     if (!job) return;
+    const epoch = authEpoch.current;
     setDownloading(true);
     setJobError("");
     try {
@@ -344,6 +643,7 @@ export function Editor({
       a.download = "demopop-redesign.mp4";
       a.click();
     } catch (e) {
+      handleAuthFailure(e, epoch);
       setJobError((e as Error).message);
     } finally {
       setDownloading(false);
@@ -351,7 +651,7 @@ export function Editor({
   }
   const activeJob = job && ["queued", "rendering"].includes(job.status);
   function field(
-    key: "name" | "opening" | "highlight1" | "highlight2" | "url",
+    key: "name" | "opening" | "highlight1" | "highlight2" | "url" | "cta",
     label: string,
     max: number,
     multiline = false,
@@ -370,12 +670,23 @@ export function Editor({
             value={project[key]}
             maxLength={max}
             onChange={(e) => update(key, e.target.value)}
+            onFocus={() => showScene("Opening")}
           />
         ) : (
           <input
             value={project[key]}
             maxLength={max}
             onChange={(e) => update(key, e.target.value)}
+            onFocus={() => {
+              if (key !== "name")
+                showScene(
+                  key === "highlight1"
+                    ? "Highlight 01"
+                    : key === "highlight2"
+                      ? "Highlight 02"
+                      : "Closing",
+                );
+            }}
           />
         )}
       </label>
@@ -395,7 +706,19 @@ export function Editor({
             {key === "before" ? "The starting point" : "The transformation"}
           </span>
         </div>
-        <label className="upload-area">
+        <label
+          className={`upload-area ${dragging === key ? "is-dragging" : ""}`}
+          onDragOver={(event) => {
+            event.preventDefault();
+            if (!uploading) setDragging(key);
+          }}
+          onDragLeave={() => setDragging(null)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(null);
+            if (!uploading) void upload(key, event.dataTransfer.files[0]);
+          }}
+        >
           <img
             src={asset.src}
             alt={`${key} website screenshot`}
@@ -422,6 +745,9 @@ export function Editor({
             aria-label={`Upload ${key} screenshot`}
           />
         </label>
+        <span className="asset-dimensions">
+          {asset.width} × {asset.height}
+        </span>
         <button
           className="crop-toggle"
           aria-expanded={cropOpen === key}
@@ -485,11 +811,20 @@ export function Editor({
       <main className="loading-page">
         <AlertCircle />
         <p role="alert">{loadError}</p>
+        {configured && authenticated === false && (
+          <EditorSignIn onSignedIn={signedIn} />
+        )}
+        <button
+          className="button secondary"
+          onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+        >
+          Retry opening project
+        </button>
         <Link href="/projects">Back to projects</Link>
       </main>
     );
   return (
-    <div className="editor">
+    <div className="editor studio-editor">
       <header className="editor-header">
         <Brand />
         <span className="header-divider" />
@@ -517,13 +852,38 @@ export function Editor({
           </small>
         </div>
         <div className="header-actions">
+          <div className="history-controls" aria-label="Edit history">
+            <button
+              aria-label="Undo"
+              title="Undo (Ctrl/⌘ Z)"
+              disabled={!history.previous || !!uploading || saving || exporting}
+              onClick={() => moveHistory("undo")}
+            >
+              <Undo2 size={17} />
+            </button>
+            <button
+              aria-label="Redo"
+              title="Redo (Ctrl/⌘ Shift Z)"
+              disabled={!history.next || !!uploading || saving || exporting}
+              onClick={() => moveHistory("redo")}
+            >
+              <Redo2 size={17} />
+            </button>
+          </div>
           <button
             className="button secondary small"
             disabled={
-              !configured || saving || exporting || !!uploading || !dirty
+              !configured ||
+              authenticated !== true ||
+              saving ||
+              exporting ||
+              !!uploading ||
+              !dirty
             }
             title={
-              !configured ? "Configure Supabase to save projects" : undefined
+              !configured
+                ? "Cloud saving is not connected in this workspace"
+                : undefined
             }
             onClick={save}
           >
@@ -533,11 +893,16 @@ export function Editor({
           <button
             className="button primary small"
             disabled={
-              !configured || saving || exporting || !!uploading || !!activeJob
+              !configured ||
+              authenticated !== true ||
+              saving ||
+              exporting ||
+              !!uploading ||
+              !!activeJob
             }
             title={
               !configured
-                ? "Cloud export requires Supabase and a running worker"
+                ? "MP4 export is not connected in this workspace"
                 : undefined
             }
             onClick={startExport}
@@ -551,6 +916,58 @@ export function Editor({
           </button>
         </div>
       </header>
+      <div className="editor-feedback" aria-label="Editor feedback">
+        <DraftRecovery
+          scope={draftScope}
+          projectId={id}
+          project={project}
+          assets={localAssets}
+          dirty={draftDirty}
+          onRestore={restoreDraft}
+        />
+        {configured && authenticated === null && (
+          <p className="notice" role="status">
+            Checking your account…
+          </p>
+        )}
+        {configured && authenticated === false && (
+          <EditorSignIn onSignedIn={signedIn} />
+        )}
+        {error && (
+          <div
+            className="error editor-message"
+            role="alert"
+            data-testid="editor-error"
+          >
+            <span>{error}</span>
+            <button onClick={() => setError("")} aria-label="Dismiss error">
+              <X size={15} />
+            </button>
+          </div>
+        )}
+        {refreshError && (
+          <div className="error editor-message" role="alert">
+            <span>{refreshError}</span>
+            <button
+              className="text-link"
+              onClick={() => void refreshMedia.current()}
+            >
+              Retry image access
+            </button>
+          </div>
+        )}
+        {uploading && (
+          <p className="notice" role="status">
+            Uploading{" "}
+            {uploading === "logo" ? "logo" : `${uploading} screenshot`}…
+          </p>
+        )}
+        {notice && (
+          <div className="success-message" role="status">
+            {notice}
+          </div>
+        )}
+      </div>
       <div className="mobile-tabs">
         <button
           aria-pressed={mobile === "preview"}
@@ -564,51 +981,189 @@ export function Editor({
         >
           Settings
         </button>
+        <button
+          className="tab-edit"
+          aria-label="Undo"
+          disabled={!history.previous || !!uploading || saving || exporting}
+          onClick={() => moveHistory("undo")}
+        >
+          <Undo2 size={17} />
+        </button>
+        <button
+          className="tab-edit"
+          aria-label="Redo"
+          disabled={!history.next || !!uploading || saving || exporting}
+          onClick={() => moveHistory("redo")}
+        >
+          <Redo2 size={17} />
+        </button>
       </div>
       <div className="editor-body">
         <aside
           className={`settings-panel ${mobile === "settings" ? "mobile-visible" : ""}`}
         >
           <div className="panel-heading">
-            <div className="eyebrow">MAKE IT YOURS</div>
+            <div className="eyebrow">YOUR REVEAL STUDIO</div>
             <h1>The details</h1>
-            <p>A few small inputs. A big reveal.</p>
+            <p>Start with a style. Make it unmistakably yours.</p>
           </div>
-          <section className="settings-section">
+          <nav className="inspector-nav" aria-label="Editor sections">
+            {[
+              ["motion-settings", "Style"],
+              ["media-settings", "Screenshots"],
+              ["story-settings", "Story"],
+              ["brand-settings", "Brand"],
+            ].map(([section, label]) => (
+              <button
+                key={section}
+                onClick={() =>
+                  document.getElementById(section)?.scrollIntoView({
+                    block: "start",
+                    behavior: window.matchMedia(
+                      "(prefers-reduced-motion: reduce)",
+                    ).matches
+                      ? "instant"
+                      : "smooth",
+                  })
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+          <section className="settings-section" id="motion-settings">
             <h2>
-              <span>01</span> Your screenshots
+              <span>01</span> Motion & format
+            </h2>
+            <MotionControls project={project} onChange={update} />
+            {project.template === "launch" && (
+              <div className="launch-settings">
+                <div className="launch-story-badge">
+                  15s LAUNCH CUT <span>HOOK → PROOF → ACTION</span>
+                </div>
+                <label className="field">
+                  <span>Soundtrack</span>
+                  <select
+                    value={project.sound}
+                    onChange={(event) =>
+                      update(
+                        "sound",
+                        event.target.value as ProjectInput["sound"],
+                      )
+                    }
+                  >
+                    <option value="pulse">Launch pulse · original synth</option>
+                    <option value="off">Silent</option>
+                  </select>
+                </label>
+                <p className="section-hint">
+                  Bass, risers, and ticks synced to the edit. Included in your
+                  exported MP4.
+                </p>
+              </div>
+            )}
+          </section>
+          <section className="settings-section" id="media-settings">
+            <h2>
+              <span>02</span> Your screenshots
             </h2>
             <p className="section-hint">PNG, JPEG or WebP · up to 10 MB each</p>
             <div className="assets-grid">
               {assetCard("before")}
               {assetCard("after")}
             </div>
+            <button
+              className="swap-screenshots text-link"
+              disabled={!!uploading}
+              onClick={() => {
+                setProject((current) => ({
+                  ...current,
+                  before: current.after,
+                  after: current.before,
+                  beforeCrop: current.afterCrop,
+                  afterCrop: current.beforeCrop,
+                }));
+                setMedia((current) => ({
+                  ...current,
+                  before: current.after,
+                  after: current.before,
+                }));
+              }}
+            >
+              <ArrowLeftRight size={14} /> Swap screenshots
+            </button>
           </section>
-          <section className="settings-section">
+          <section className="settings-section" id="story-settings">
             <h2>
-              <span>02</span> Tell the story
+              <span>03</span> Tell the story
             </h2>
             {field("name", "Project name", 60)}
             {field("opening", "Opening caption", 70, true)}
+            {project.template === "launch" && (
+              <p className="section-hint launch-copy-hint">
+                The first 1.8 seconds: one bold idea. Give people a reason to
+                keep watching.
+              </p>
+            )}
+            {project.template === "launch" && (
+              <div
+                className="launch-hook-angles"
+                aria-label="Opening hook angles"
+              >
+                <span>Try an opening angle</span>
+                <div>
+                  {[
+                    [
+                      "Product",
+                      `Meet ${project.name.trim() || "what’s next"}.`,
+                    ],
+                    ["Benefit", project.highlight1],
+                    ["Curiosity", "What comes after\n“what if”?"],
+                  ].map(([name, copy]) => (
+                    <button
+                      key={name}
+                      className="text-link"
+                      onClick={() => {
+                        update("opening", copy);
+                        showScene("Opening");
+                      }}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             {field("highlight1", "First highlight", 48)}
             {field("highlight2", "Second highlight", 48)}
+            {project.template === "launch" &&
+              field("cta", "Closing call to action", 36)}
+            <p className="section-hint story-hint">
+              Select a caption to preview its moment in the video.
+            </p>
           </section>
-          <section className="settings-section">
+          <section className="settings-section" id="brand-settings">
             <h2>
-              <span>03</span> Make your mark
+              <span>04</span> Make your mark
             </h2>
+            <BrandColor
+              value={project.color}
+              onChange={(color) => update("color", color)}
+            />
             <label className="field">
-              <span>Brand color</span>
-              <div className="color-field">
-                <input
-                  type="color"
-                  aria-label="Choose brand color"
-                  value={project.color}
-                  onChange={(e) => update("color", e.target.value)}
-                />
-                <span>{project.color.toUpperCase()}</span>
-                <span className="color-preview">Aa</span>
-              </div>
+              <span>Video font</span>
+              <select
+                value={project.font}
+                onChange={(event) =>
+                  update("font", event.target.value as ProjectInput["font"])
+                }
+              >
+                {Object.entries(FONTS).map(([key, font]) => (
+                  <option key={key} value={key}>
+                    {font.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <div className="field">
               <span>
@@ -647,8 +1202,22 @@ export function Editor({
             {field("url", "Closing URL text", 80)}
             <p className="section-hint">Shown as text in your video.</p>
           </section>
+          <section className="settings-section">
+            <h2>
+              <span>05</span> Reuse your brand
+            </h2>
+            <BrandKits
+              project={project}
+              authorized={authenticated === true}
+              onApply={applyBrand}
+              onUnauthorized={() => {
+                setAuthenticated(false);
+                sessionVersion.current++;
+              }}
+            />
+          </section>
           <div className="sidebar-end">
-            <Film size={15} /> One template. All about your work.
+            <Film size={15} /> Four styles. Your next big reveal.
           </div>
         </aside>
         <main
@@ -656,47 +1225,46 @@ export function Editor({
         >
           <div className="preview-heading">
             <div>
-              <span className="eyebrow">THE REVEAL</span>
-              <h2>A new perspective.</h2>
+              <span className="eyebrow">LIVE PREVIEW</span>
+              <h2>Your work, in motion.</h2>
             </div>
             <span className="template-tag">
-              <span className="blue-dot" /> Reveal / 01
+              <span className="blue-dot" />{" "}
+              {
+                TEMPLATES.find((template) => template.id === project.template)
+                  ?.name
+              }
             </span>
           </div>
           {!configured && (
             <div className="local-notice">
-              <span className="local-tag">LOCAL PREVIEW</span>
+              <span className="local-tag">PREVIEW MODE</span>
               <span>
-                Edit, upload locally, and play. Cloud saving and export need
-                Supabase setup.
+                Drafts stay on this device. Cloud saving and MP4 export aren’t
+                connected.
               </span>
               <Link href="/auth" aria-label="Account setup information">
                 <ArrowUpRight size={15} />
               </Link>
             </div>
           )}
-          {error && (
-            <div className="error editor-message" role="alert">
-              {error}
-              <button onClick={() => setError("")} aria-label="Dismiss error">
-                <X size={15} />
-              </button>
-            </div>
-          )}
-          {notice && (
-            <div className="success-message" role="status">
-              {notice}
-            </div>
-          )}
           <div className="editor-stage">
             <div className="editor-stage-grid" />
-            <Preview input={{ project, ...media } as VideoProps} />
+            <Preview
+              input={{ project, ...media } as VideoProps}
+              onRetry={() => void refreshMedia.current()}
+              scenes
+              focusFrame={focusFrame}
+            />
           </div>
           <div className="preview-footer">
             <span>
-              VERTICAL <span>·</span> 1080 × 1920 <span>·</span> 30 FPS
+              {project.format.toUpperCase()} <span>·</span> {dimensions.width} ×{" "}
+              {dimensions.height} <span>·</span> 30 FPS
             </span>
-            <span>15 seconds, made to make an impression.</span>
+            <span>
+              <kbd>Space</kbd> Play / pause
+            </span>
           </div>
           {job && (
             <button
@@ -715,12 +1283,29 @@ export function Editor({
                   ? "Waiting for a render worker"
                   : job.status === "rendering"
                     ? `Rendering · ${Math.floor(job.progress * 100)}%`
-                    : job.status === "completed"
-                      ? "Your video is ready to download"
-                      : "Export failed — view details"}
+                    : job.output_expired_at
+                      ? "This export has expired — create a new export"
+                      : job.status === "completed"
+                        ? "Your video is ready to download"
+                        : "Export failed — view details"}
               </span>
               <ArrowUpRight size={16} />
             </button>
+          )}
+          {id && authenticated === true && (
+            <ExportHistory
+              projectId={id}
+              revision={`${job?.id || ""}/${job?.status || ""}`}
+              active={!!activeJob}
+              onRetried={(retried) => {
+                setJob(retried);
+                setJobPanel(true);
+              }}
+              onUnauthorized={() => {
+                setAuthenticated(false);
+                sessionVersion.current++;
+              }}
+            />
           )}
           {!configured && (
             <p className="local-render-tip">
@@ -749,22 +1334,26 @@ export function Editor({
             </button>
             <div className="eyebrow">YOUR BIG REVEAL</div>
             <h2 id="export-title">
-              {job.status === "completed"
-                ? "Ready for the spotlight."
-                : job.status === "failed"
-                  ? "Let’s try that again."
-                  : job.status === "queued"
-                    ? "You’re in the queue."
-                    : "Making it move."}
+              {job.output_expired_at
+                ? "This export has expired."
+                : job.status === "completed"
+                  ? "Ready for the spotlight."
+                  : job.status === "failed"
+                    ? "Let’s try that again."
+                    : job.status === "queued"
+                      ? "You’re in the queue."
+                      : "Making it move."}
             </h2>
             <p>
               {job.status === "queued"
                 ? "Waiting for an available worker. You can keep editing."
                 : job.status === "rendering"
                   ? "Rendering your 15-second MP4 in the background."
-                  : job.status === "completed"
-                    ? "1080 × 1920 · 30 fps · H.264 MP4"
-                    : job.error}
+                  : job.output_expired_at
+                    ? "Create a new export to render your current project settings."
+                    : job.status === "completed"
+                      ? `${job.format === "landscape" ? "1920 × 1080" : "1080 × 1920"} · 30 fps · H.264 MP4`
+                      : job.error}
             </p>
             {activeJob && (
               <>
@@ -791,7 +1380,7 @@ export function Editor({
                 {jobError}
               </p>
             )}
-            {job.status === "completed" && (
+            {job.status === "completed" && !job.output_expired_at && (
               <button
                 className="button primary"
                 onClick={download}
