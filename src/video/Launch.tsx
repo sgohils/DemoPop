@@ -19,6 +19,8 @@ import {
   fitLaunchText,
   launchAccent,
   launchProgress as move,
+  launchAfterGeometry,
+  launchDetailZoom,
   launchShotGeometry,
 } from "./launch-motion";
 
@@ -109,12 +111,26 @@ function ProductScreen({
     crop: ProjectInput["afterCrop"],
     isBefore = false,
   ) => {
-    const aspect = media.width / media.height;
-    // A desktop screen benefits from a detail punch-in. Tall uploads already
-    // fill the view, while panoramic uploads already require a strong cover.
-    // Dampen only the added camera zoom; the user's selected crop is preserved.
-    const detailWeight = aspect < 1 ? 0 : aspect > 2.4 ? 0.2 : 1;
-    const zoom = 1 + (pose.zoom - 1) * detailWeight;
+    const geometry = isBefore
+      ? launchShotGeometry(
+          media,
+          crop,
+          width,
+          height,
+          launchDetailZoom(media, pose.zoom),
+          pose.anchorX,
+          pose.anchorY,
+        )
+      : launchAfterGeometry(
+          media,
+          project,
+          width,
+          height,
+          frame,
+          pose.zoom,
+          pose.anchorX,
+          pose.anchorY,
+        );
     return (
       <Img
         src={media.src}
@@ -123,15 +139,7 @@ function ProductScreen({
         style={{
           position: "absolute",
           maxWidth: "none",
-          ...launchShotGeometry(
-            media,
-            crop,
-            width,
-            height,
-            zoom,
-            pose.anchorX,
-            pose.anchorY,
-          ),
+          ...geometry,
           filter: isBefore ? "saturate(0.12) contrast(0.94)" : undefined,
         }}
       />

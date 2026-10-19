@@ -2,7 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 
 async function openEditor(page: Page) {
   await page.goto("/");
-  await page.getByRole("link", { name: "Create a video", exact: true }).click();
+  await page.getByRole("link", { name: "Try the studio", exact: true }).click();
   await expect(page.getByLabel("Project name")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Save", exact: true }),

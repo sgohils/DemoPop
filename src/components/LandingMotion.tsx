@@ -76,19 +76,21 @@ const storySteps = [
   {
     name: "Drop it in.",
     detail:
-      "Your before. Your after. The raw material for a very good entrance.",
+      "Start with a website URL, product screenshots, or short clips. Your actual product is the raw material.",
     number: "01",
     label: "THE STARTING POINT",
   },
   {
     name: "Make it yours.",
-    detail: "Choose your motion, write the hook, and bring your own signature.",
+    detail:
+      "Build a 3–6 scene story. Set the pace, write your hooks, and bring your own brand.",
     number: "02",
     label: "THE CREATIVE DIRECTION",
   },
   {
     name: "Send it out.",
-    detail: "A polished 15-second MP4, ready for the feed or the big screen.",
+    detail:
+      "Export one film or a nine-video launch package. Share the exact version for client feedback and approval.",
     number: "03",
     label: "THE FINISHED FILM",
   },
@@ -103,7 +105,7 @@ export function ProductStory() {
         <div
           className={styles.storyTabs}
           role="tablist"
-          aria-label="From screenshots to launch film"
+          aria-label="From product to launch campaign"
         >
           {storySteps.map((step, index) => (
             <button

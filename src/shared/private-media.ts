@@ -4,16 +4,16 @@ export type MediaSlot = "before" | "after" | "logo";
 
 // A lifecycle-scoped refresher: disposing invalidates even fetches that ignore
 // AbortSignal, so an old asset response can never replace the current image.
-export function createMediaRefresher({
+export function createMediaRefresher<Slot extends string = MediaSlot>({
   assets,
   fetchMedia,
   onMedia,
   onError,
   onSuccess,
 }: {
-  assets: Record<MediaSlot, string | null>;
+  assets: Record<Slot, string | null>;
   fetchMedia: (id: string, signal: AbortSignal) => Promise<Media>;
-  onMedia: (slot: MediaSlot, id: string, media: Media) => void;
+  onMedia: (slot: Slot, id: string, media: Media) => void;
   onError: (error: unknown) => void;
   onSuccess: () => void;
 }) {
@@ -26,7 +26,7 @@ export function createMediaRefresher({
       if (pending) return pending;
       pending = (async () => {
         const results = await Promise.allSettled(
-          (Object.entries(assets) as [MediaSlot, string | null][])
+          (Object.entries(assets) as [Slot, string | null][])
             .filter(([, id]) => id && !id.startsWith("sample-"))
             .map(async ([slot, id]) => {
               const media = await fetchMedia(id!, controller.signal);

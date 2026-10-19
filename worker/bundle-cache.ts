@@ -6,7 +6,8 @@ export function createBundleCache(
   build: (directory: string) => Promise<string>,
   rootDirectory = process.cwd(),
 ) {
-  const root = path.resolve(rootDirectory);
+  // This is a runtime temporary-output parent, not a directory to deploy.
+  const root = path.resolve(/* turbopackIgnore: true */ rootDirectory);
   const prefix = ".render-bundle-";
   const createdDirectories = new Set<string>();
   let current: Promise<string> | undefined;

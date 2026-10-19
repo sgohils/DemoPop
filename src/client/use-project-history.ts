@@ -15,6 +15,11 @@ export function useProjectHistory(initial: ProjectInput) {
     dispatch({ type: "edit", value, at: Date.now() });
   }, []);
   const undo = useCallback(() => dispatch({ type: "undo" }), []);
+  const apply = useCallback(
+    (value: SetStateAction<ProjectInput>) =>
+      dispatch({ type: "edit", value, at: Date.now(), atomic: true }),
+    [],
+  );
   const redo = useCallback(() => dispatch({ type: "redo" }), []);
   const reset = useCallback(
     (value: ProjectInput) => dispatch({ type: "reset", value }),
@@ -23,6 +28,7 @@ export function useProjectHistory(initial: ProjectInput) {
   return {
     project,
     setProject,
+    apply,
     previous: history.entries[history.index - 1],
     next: history.entries[history.index + 1],
     undo,

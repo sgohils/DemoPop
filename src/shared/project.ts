@@ -1,9 +1,11 @@
 import { z } from "zod";
-export const TEMPLATE_VERSION = "launch-4";
+export const TEMPLATE_VERSION = "studio-6";
 export const SUPPORTED_TEMPLATE_VERSIONS = new Set([
   "reveal-1",
   "studio-2",
   "launch-3",
+  "launch-4",
+  "launch-5",
   TEMPLATE_VERSION,
 ]);
 export const TEMPLATES = [
@@ -34,7 +36,7 @@ export const FONTS = {
   "dm-sans": { name: "DM Sans", file: "fonts/dm-sans.ttf", weight: "100 1000" },
 } as const;
 export const fontSchema = z.enum(["manrope", "dm-sans"]);
-export const formatSchema = z.enum(["vertical", "landscape"]);
+export const formatSchema = z.enum(["vertical", "landscape", "square"]);
 export const templateSchema = z.enum(["reveal", "slide", "split", "launch"]);
 export const VIDEO = {
   width: 1080,
@@ -81,6 +83,32 @@ export const assetIdSchema = z.union([
   ]),
   z.uuid(),
 ]);
+export const storySceneSchema = z
+  .object({
+    id: z.uuid(),
+    asset: assetIdSchema,
+    caption: z.string().trim().min(1).max(70),
+    crop: cropSchema,
+    weight: z.number().int().min(1).max(5),
+    trimStart: z.number().min(0).max(29).default(0),
+  })
+  .strict();
+export const storySchema = z
+  .object({
+    duration: z.union([z.literal(15), z.literal(30), z.literal(60)]),
+    scenes: z
+      .array(storySceneSchema)
+      .min(3)
+      .max(6)
+      .refine(
+        (scenes) =>
+          new Set(scenes.map((scene) => scene.id)).size === scenes.length,
+        "Each scene needs a unique ID.",
+      ),
+  })
+  .strict();
+export type StoryScene = z.infer<typeof storySceneSchema>;
+export type Story = z.infer<typeof storySchema>;
 export const projectSchema = z
   .object({
     name: z.string().trim().min(1).max(60),
@@ -99,6 +127,12 @@ export const projectSchema = z
     logo: assetIdSchema.nullable(),
     beforeCrop: cropSchema,
     afterCrop: cropSchema,
+    highlight1Crop: cropSchema.nullable().optional(),
+    highlight2Crop: cropSchema.nullable().optional(),
+    story: storySchema.nullable().optional(),
+    hooks: z.array(z.string().trim().min(1).max(70)).length(3).optional(),
+    client: z.string().trim().max(60).optional(),
+    sourceUrl: z.url().max(2048).optional(),
   })
   .strict();
 export type ProjectInput = z.infer<typeof projectSchema>;
@@ -112,19 +146,40 @@ export const brandKitSchema = z
   })
   .strict();
 export type BrandKitInput = z.infer<typeof brandKitSchema>;
-export function videoSettings(project: Pick<ProjectInput, "format">) {
+export function videoSettings(project: Pick<ProjectInput, "format" | "story">) {
   return {
     ...VIDEO,
     ...(project.format === "landscape" ? { width: 1920, height: 1080 } : {}),
+    ...(project.format === "square" ? { width: 1080, height: 1080 } : {}),
+    durationInFrames: (project.story?.duration ?? 15) * VIDEO.fps,
   };
 }
-export type Media = { src: string; width: number; height: number };
+export type Media = {
+  src: string;
+  width: number;
+  height: number;
+  kind?: "video";
+  duration?: number;
+};
 export type VideoProps = {
   project: ProjectInput;
   before: Media;
   after: Media;
   logo: Media | null;
+  sceneMedia?: Record<string, Media>;
 };
+export function projectAssetIds(project: ProjectInput) {
+  return [
+    ...new Set(
+      [
+        project.before,
+        project.after,
+        project.logo,
+        ...(project.story?.scenes.map((scene) => scene.asset) ?? []),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+}
 export const defaultCrop = { x: 0.5, y: 0, zoom: 1 };
 export const sampleProject: ProjectInput = {
   name: "Forma Studio",

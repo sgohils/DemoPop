@@ -29,7 +29,7 @@ The editor exposes a Soundtrack setting and a custom closing action of up to 36 
 
 ## Deployment
 
-Apply all outstanding migrations through **`supabase/migrations/005_launch_quality.sql`** before using this release against hosted Supabase. Migration 004 allows the controlled Orbit sample IDs; 005 labels new jobs `launch-4`. All other assets require registered owner access. Deploy the updated web process and worker together. The worker accepts `reveal-1`, `studio-2`, `launch-3`, and `launch-4` jobs. Existing snapshots and completed files remain immutable.
+Apply all outstanding migrations through **`supabase/migrations/007_launch_workspace.sql`** before using the current release against hosted Supabase. Migration 004 allows the controlled Orbit sample IDs; 005 labels the earlier camera revision `launch-4`; 006 introduced `launch-5` highlight framing; 007 adds the launch workspace and labels new jobs `studio-6`. Deploy the updated web process and worker together. The worker accepts every earlier version. Existing snapshots and completed files remain immutable. See [highlight framing and screenshot quality](DEMOPOP_VIDEO_QUALITY.md) and [Launch workspace](DEMOPOP_LAUNCH_WORKSPACE.md) for subsequent changes.
 
 ## Reproducing the sample
 

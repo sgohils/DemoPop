@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
+import { BrandMark } from "./BrandMark";
 import styles from "./launch-scroll.module.css";
 
 const FILM = "/films/demopop-launch.mp4";
@@ -62,6 +63,9 @@ export function LaunchScroll() {
   const fullFilm = useRef<HTMLVideoElement>(null);
   const watchButton = useRef<HTMLButtonElement>(null);
   const createButton = useRef<HTMLAnchorElement>(null);
+  const intro = useRef<HTMLDivElement>(null);
+  const mobileChapter = useRef<HTMLDivElement>(null);
+  const bottomBar = useRef<HTMLDivElement>(null);
   const mobileChapterKicker = useRef<HTMLSpanElement>(null);
   const mobileChapterHeadline = useRef<HTMLParagraphElement>(null);
   const unlockPage = useRef<(() => void) | null>(null);
@@ -80,6 +84,46 @@ export function LaunchScroll() {
     let visible = false;
     let currentChapter = -1;
     let disposed = false;
+    let displayedAmount: number | null = null;
+    let previousTime = 0;
+    let layoutDirty = true;
+    const introLinks = Array.from(intro.current?.querySelectorAll("a") ?? []);
+    let copyInteractive: boolean | null = null;
+    let layout = {
+      start: 0,
+      distance: 1,
+      height: 1,
+      stageHeight: 1,
+      filmHeight: 1,
+      introBottom: 0,
+      chapterBottom: 0,
+      bottom: 1,
+    };
+
+    // Read geometry together, only when content or viewport dimensions change.
+    // The animation itself writes transforms and opacity without forcing layout.
+    const measure = () => {
+      const bounds = element.getBoundingClientRect();
+      layout = {
+        start: bounds.top + window.scrollY,
+        distance: Math.max(1, bounds.height - window.innerHeight),
+        height: bounds.height,
+        stageHeight: surface.clientHeight,
+        filmHeight: (surface.clientWidth * 0.92 * 9) / 16,
+        introBottom: intro.current
+          ? intro.current.offsetTop + intro.current.offsetHeight + 24
+          : 0,
+        chapterBottom: mobileChapter.current
+          ? mobileChapter.current.offsetTop +
+            mobileChapter.current.offsetHeight +
+            24
+          : 0,
+        bottom: bottomBar.current
+          ? bottomBar.current.offsetTop - 24
+          : surface.clientHeight,
+      };
+      layoutDirty = false;
+    };
 
     // A decoder finishes one seek before the next starts, even during a fast fling.
     // This avoids a queue of stale frame requests on mobile hardware.
@@ -98,22 +142,44 @@ export function LaunchScroll() {
       film.currentTime = targetTime;
     };
 
-    const update = () => {
+    const update = (now: number) => {
       raf = 0;
-      if (disposed || dialog.current?.open) return;
-      const bounds = element.getBoundingClientRect();
+      if (disposed || dialog.current?.open || document.hidden) {
+        previousTime = 0;
+        return;
+      }
+      if (layoutDirty) measure();
       if (visible && !motion.matches && !film.getAttribute("src")) {
         film.preload = "auto";
         film.src = FILM;
         film.load();
       }
-      if (!visible && (bounds.bottom < 0 || bounds.top > window.innerHeight)) {
+      const scroll = window.scrollY;
+      if (
+        !visible &&
+        (scroll > layout.start + layout.height ||
+          scroll + window.innerHeight < layout.start)
+      ) {
+        displayedAmount = null;
+        previousTime = 0;
         return;
       }
-      const distance = Math.max(1, bounds.height - window.innerHeight);
-      const amount = motion.matches
+      const targetAmount = motion.matches
         ? 0
-        : Math.max(0, Math.min(1, -bounds.top / distance));
+        : Math.max(0, Math.min(1, (scroll - layout.start) / layout.distance));
+      const elapsed = previousTime
+        ? Math.min(64, now - previousTime)
+        : 1000 / 60;
+      // Time-based damping feels the same on 60/120 Hz displays and settles
+      // quickly after a wheel tick, touch fling, or a reversal.
+      let amount =
+        displayedAmount === null || motion.matches || !visible
+          ? targetAmount
+          : displayedAmount +
+            (targetAmount - displayedAmount) * (1 - Math.exp(-elapsed / 90));
+      if (Math.abs(targetAmount - amount) < 0.0001) amount = targetAmount;
+      displayedAmount = amount;
+      previousTime = now;
       const expansion = Math.min(1, amount / 0.42);
       const eased = expansion * expansion * (3 - 2 * expansion);
       const copyExit = Math.max(
@@ -122,42 +188,6 @@ export function LaunchScroll() {
       );
       const chapterEntrance = Math.max(0, Math.min(1, (amount - 0.205) / 0.11));
       const initialScale = mobile.matches ? 0.96 : 0.59;
-
-      surface.style.setProperty(
-        "--film-scale",
-        `${initialScale + (1 - initialScale) * eased}`,
-      );
-      surface.style.setProperty(
-        "--film-x",
-        `${mobile.matches ? 0 : 22 * (1 - eased)}vw`,
-      );
-      surface.style.setProperty(
-        "--film-y",
-        `${(mobile.matches ? 95 : 12) * (1 - eased)}px`,
-      );
-      surface.style.setProperty(
-        "--film-rotate",
-        `${mobile.matches ? 0 : -5 * (1 - eased)}deg`,
-      );
-      surface.style.setProperty("--copy-opacity", `${1 - copyExit}`);
-      surface.style.setProperty("--copy-y", `${-70 * copyExit}px`);
-      surface.style.setProperty("--chapter-opacity", `${chapterEntrance}`);
-      surface.style.setProperty(
-        "--chapter-y",
-        `${20 * (1 - chapterEntrance)}px`,
-      );
-      surface.style.setProperty(
-        "--copy-events",
-        copyExit >= 0.98 ? "none" : "auto",
-      );
-      if (createButton.current)
-        createButton.current.tabIndex = copyExit >= 0.98 ? -1 : 0;
-      surface.style.setProperty("--ambient", `${0.2 + 0.8 * eased}`);
-      surface.dataset.scrollProgress = amount.toFixed(3);
-      element.dataset.scrollProgress = amount.toFixed(3);
-      element.dataset.reducedMotion = String(motion.matches);
-      if (progress.current) progress.current.value = amount;
-
       const nextChapter = CHAPTERS.findLastIndex((item) => amount >= item.at);
       if (nextChapter !== currentChapter) {
         currentChapter = nextChapter;
@@ -171,7 +201,60 @@ export function LaunchScroll() {
           mobileChapterKicker.current.textContent = `${next.number} / ${next.name}`;
         if (mobileChapterHeadline.current)
           mobileChapterHeadline.current.textContent = next.headline;
+        // A chapter can have a different text height; measure once at the swap.
+        if (mobile.matches) measure();
       }
+      let filmFit = 1;
+      let filmY = 12 * (1 - eased);
+      if (mobile.matches && !motion.matches) {
+        const top =
+          layout.introBottom +
+          (layout.chapterBottom - layout.introBottom) * copyExit;
+        const height = Math.max(
+          1,
+          Math.min(layout.filmHeight, layout.bottom - top),
+        );
+        filmFit = height / layout.filmHeight;
+        filmY = top + (layout.bottom - top) / 2 - layout.stageHeight / 2;
+      }
+
+      surface.style.setProperty(
+        "--film-scale",
+        `${(initialScale + (1 - initialScale) * eased) * filmFit}`,
+      );
+      surface.style.setProperty(
+        "--film-x",
+        `${mobile.matches ? 0 : 22 * (1 - eased)}vw`,
+      );
+      surface.style.setProperty("--film-y", `${filmY}px`);
+      surface.style.setProperty(
+        "--film-rotate",
+        `${mobile.matches ? 0 : -5 * (1 - eased)}deg`,
+      );
+      surface.style.setProperty("--copy-opacity", `${1 - copyExit}`);
+      surface.style.setProperty("--copy-y", `${-70 * copyExit}px`);
+      surface.style.setProperty("--chapter-opacity", `${chapterEntrance}`);
+      surface.style.setProperty(
+        "--chapter-y",
+        `${20 * (1 - chapterEntrance)}px`,
+      );
+      const interactive = copyExit < 0.98;
+      if (interactive !== copyInteractive) {
+        copyInteractive = interactive;
+        surface.style.setProperty(
+          "--copy-events",
+          interactive ? "auto" : "none",
+        );
+        introLinks.forEach((link) => {
+          link.tabIndex = interactive ? 0 : -1;
+        });
+      }
+      surface.style.setProperty("--ambient", `${0.2 + 0.8 * eased}`);
+      surface.dataset.scrollProgress = amount.toFixed(3);
+      element.dataset.scrollProgress = amount.toFixed(3);
+      element.dataset.reducedMotion = String(motion.matches);
+      if (progress.current) progress.current.value = amount;
+
       if (loaded && Number.isFinite(film.duration)) {
         targetTime = Math.max(
           0,
@@ -179,6 +262,8 @@ export function LaunchScroll() {
         );
         seek();
       }
+      if (amount !== targetAmount) schedule();
+      else previousTime = 0;
     };
     const schedule = () => {
       if (!raf) raf = window.requestAnimationFrame(update);
@@ -187,6 +272,25 @@ export function LaunchScroll() {
       loaded = true;
       schedule();
     };
+    const invalidateLayout = () => {
+      layoutDirty = true;
+      schedule();
+    };
+    const visibilityChanged = () => {
+      displayedAmount = null;
+      previousTime = 0;
+      schedule();
+    };
+    const resizeObserver = new ResizeObserver(invalidateLayout);
+    for (const node of [
+      element,
+      surface,
+      intro.current,
+      mobileChapter.current,
+      bottomBar.current,
+    ]) {
+      if (node) resizeObserver.observe(node);
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         visible = entry.isIntersecting;
@@ -199,9 +303,15 @@ export function LaunchScroll() {
     film.addEventListener("loadedmetadata", metadata);
     film.addEventListener("seeked", seek);
     window.addEventListener("scroll", schedule, { passive: true });
-    window.addEventListener("resize", schedule, { passive: true });
-    motion.addEventListener("change", schedule);
-    mobile.addEventListener("change", schedule);
+    window.addEventListener("resize", invalidateLayout, { passive: true });
+    motion.addEventListener("change", invalidateLayout);
+    mobile.addEventListener("change", invalidateLayout);
+    document.addEventListener("visibilitychange", visibilityChanged);
+    const filmDialog = dialog.current;
+    filmDialog?.addEventListener("close", invalidateLayout);
+    void document.fonts.ready.then(() => {
+      if (!disposed) invalidateLayout();
+    });
     schedule();
 
     return () => {
@@ -210,13 +320,16 @@ export function LaunchScroll() {
       unlockPage.current = null;
       if (raf) window.cancelAnimationFrame(raf);
       observer.disconnect();
+      resizeObserver.disconnect();
       film.pause();
       film.removeEventListener("loadedmetadata", metadata);
       film.removeEventListener("seeked", seek);
       window.removeEventListener("scroll", schedule);
-      window.removeEventListener("resize", schedule);
-      motion.removeEventListener("change", schedule);
-      mobile.removeEventListener("change", schedule);
+      window.removeEventListener("resize", invalidateLayout);
+      motion.removeEventListener("change", invalidateLayout);
+      mobile.removeEventListener("change", invalidateLayout);
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      filmDialog?.removeEventListener("close", invalidateLayout);
     };
   }, []);
 
@@ -281,43 +394,38 @@ export function LaunchScroll() {
           <span>DEMOPOP / MOTION SYSTEM 01</span>
           <span>BUILT TO BE SEEN.</span>
         </div>
-        <div className={styles.intro}>
+        <div ref={intro} className={styles.intro} data-hero-intro>
           <p className={styles.eyebrow}>
-            <span /> THE LAUNCH IS PART OF THE PRODUCT
+            <span /> YOUR PRODUCT. A WHOLE LAUNCH.
           </p>
           <h1>
             You built it.
             <br />
-            <span>
-              Now make
-              <br className={styles.desktopBreak} /> it move.
-            </span>
+            <span>Now launch it.</span>
           </h1>
           <p className={styles.description}>
-            Two screenshots. Fifteen seconds.
-            <br />A launch worth watching.
+            Give your product a launch worth watching. Your story, your
+            branding, and a little motion.
           </p>
           <div className={styles.actions}>
-            <Link
-              ref={createButton}
-              href="/editor/new"
-              className={styles.create}
-            >
+            <Link ref={createButton} href="/create" className={styles.create}>
               Create a video <Arrow />
             </Link>
-            <span className={styles.noSetup}>
-              Your screenshots.
-              <br />
-              Your main character moment.
-            </span>
+            <span className={styles.noSetup}>Your product. In motion.</span>
           </div>
         </div>
 
         <div className={styles.wordmark} aria-hidden="true">
-          demopop<span>✳</span>
+          demopop
+          <BrandMark />
         </div>
 
-        <div className={styles.mobileChapter} aria-hidden="true">
+        <div
+          ref={mobileChapter}
+          className={styles.mobileChapter}
+          data-hero-chapter
+          aria-hidden="true"
+        >
           <span
             ref={mobileChapterKicker}
             className={styles.mobileChapterKicker}
@@ -352,7 +460,7 @@ export function LaunchScroll() {
           </div>
         </div>
 
-        <div className={styles.bottomBar}>
+        <div ref={bottomBar} className={styles.bottomBar} data-hero-transport>
           <div className={styles.chapter}>
             <span ref={chapterNumber} className={styles.chapterNumber}>
               01

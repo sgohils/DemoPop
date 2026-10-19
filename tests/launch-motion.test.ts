@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { coverGeometry } from "../src/shared/project";
+import {
+  coverGeometry,
+  defaultCrop,
+  type ProjectInput,
+} from "../src/shared/project";
 import { contrastRatio } from "../src/shared/video-style";
 import {
   launchAccent,
+  launchAfterGeometry,
   fitLaunchText,
   launchProgress,
   launchShotGeometry,
@@ -18,6 +23,177 @@ test("launch motion holds exactly at scene boundaries", () => {
   assert.equal(launchWindow(9, 10, 80), 0);
   assert.equal(launchWindow(35, 10, 80), 1);
   assert.equal(launchWindow(80, 10, 80), 0);
+});
+
+test("legacy and automatic framing retain the original shots for every source aspect", () => {
+  for (const media of [
+    { width: 1440, height: 2000 },
+    { width: 2560, height: 1760 },
+    { width: 3000, height: 320 },
+  ]) {
+    const aspect = media.width / media.height;
+    const detailWeight = aspect < 1 ? 0 : aspect > 2.4 ? 0.2 : 1;
+    const project = { afterCrop: { x: 0.2, y: 0.8, zoom: 1.3 } };
+    for (const frame of [0, 105, 171, 182, 217, 255, 265, 302, 354, 449]) {
+      const expected = launchShotGeometry(
+        media,
+        project.afterCrop,
+        952,
+        604,
+        1 + 0.8 * detailWeight,
+        0.63,
+        0.68,
+      );
+      for (const optional of [
+        {},
+        { highlight1Crop: null, highlight2Crop: null },
+      ]) {
+        assert.deepEqual(
+          launchAfterGeometry(
+            media,
+            { ...project, ...optional },
+            952,
+            604,
+            frame,
+            1.8,
+            0.63,
+            0.68,
+          ),
+          expected,
+        );
+      }
+    }
+  }
+});
+
+test("independent highlights can reach features outside the main crop without added automatic zoom", () => {
+  const media = { width: 1440, height: 6000 };
+  const project = {
+    afterCrop: { x: 0, y: 0, zoom: 2 },
+    highlight1Crop: { x: 1, y: 0.5, zoom: 1.2 },
+    highlight2Crop: { x: 0, y: 1, zoom: 1.7 },
+  };
+  for (const [width, height] of [
+    [946, 594],
+    [1040, 770],
+  ]) {
+    for (const frame of [193, 217, 250, 255])
+      assert.deepEqual(
+        launchAfterGeometry(
+          media,
+          project,
+          width,
+          height,
+          frame,
+          1.9,
+          0.9,
+          0.9,
+        ),
+        coverGeometry(media, project.highlight1Crop, width, height),
+      );
+    for (const frame of [275, 302, 346, 354, 449]) {
+      const current = launchAfterGeometry(
+        media,
+        project,
+        width,
+        height,
+        frame,
+        2.03,
+      );
+      assert.deepEqual(
+        current,
+        coverGeometry(media, project.highlight2Crop, width, height),
+      );
+      const base = coverGeometry(media, project.afterCrop, width, height);
+      assert.ok(
+        -current.top / current.height > (height - base.top) / base.height,
+        "second shot must reach content beyond the main viewport",
+      );
+    }
+  }
+});
+
+test("custom shot handoffs are continuous and cover the viewport throughout the film", () => {
+  const first = { x: 0, y: 0, zoom: 1 };
+  const second = { x: 1, y: 1, zoom: 2 };
+  for (const media of [
+    { width: 1440, height: 12000 },
+    { width: 12000, height: 1440 },
+    { width: 2560, height: 1760 },
+  ])
+    for (const [width, height] of [
+      [946, 594],
+      [946, 810],
+      [1120, 690],
+      [1040, 770],
+    ])
+      for (const [highlight1Crop, highlight2Crop] of [
+        [first, second],
+        [first, null],
+        [null, second],
+      ]) {
+        const project = {
+          afterCrop: defaultCrop,
+          highlight1Crop,
+          highlight2Crop,
+        };
+        for (let frame = 0; frame < 450; frame += 0.5) {
+          const shot = launchAfterGeometry(
+            media,
+            project,
+            width,
+            height,
+            frame,
+            1.9,
+            0.8,
+            0.9,
+          );
+          assert.ok(shot.left <= 1e-8 && shot.top <= 1e-8);
+          assert.ok(shot.left + shot.width >= width - 1e-8);
+          assert.ok(shot.top + shot.height >= height - 1e-8);
+          assert.ok(
+            Math.abs(shot.width / shot.height - media.width / media.height) <
+              1e-8,
+          );
+        }
+        for (const boundary of [171, 193, 255, 275, 354]) {
+          const left = launchAfterGeometry(
+            media,
+            project,
+            width,
+            height,
+            boundary - 1e-5,
+            1.9,
+          );
+          const right = launchAfterGeometry(
+            media,
+            project,
+            width,
+            height,
+            boundary + 1e-5,
+            1.9,
+          );
+          for (const key of Object.keys(left) as (keyof typeof left)[])
+            assert.ok(Math.abs(left[key] - right[key]) < 0.00001);
+        }
+      }
+});
+
+test("returning a single custom highlight to automatic leaves other scenes unchanged", () => {
+  const media = { width: 2560, height: 1760 };
+  const automatic = { afterCrop: defaultCrop };
+  const project: Pick<
+    ProjectInput,
+    "afterCrop" | "highlight1Crop" | "highlight2Crop"
+  > = {
+    ...automatic,
+    highlight1Crop: { x: 1, y: 1, zoom: 2 },
+  };
+  for (const frame of [0, 105, 170, 171, 275, 302, 354, 449])
+    assert.deepEqual(
+      launchAfterGeometry(media, project, 1040, 770, frame, 1.9),
+      launchAfterGeometry(media, automatic, 1040, 770, frame, 1.9),
+    );
 });
 
 test("launch headlines use the actual font width and balance readable phrases", () => {

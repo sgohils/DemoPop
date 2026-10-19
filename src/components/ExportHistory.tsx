@@ -11,6 +11,8 @@ export type HistoryJob = {
   format?: string;
   template?: string;
   output_expired_at?: string | null;
+  output_kind?: "video" | "launch-pack";
+  duration?: number;
 };
 export function ExportHistory({
   projectId,
@@ -88,7 +90,10 @@ export function ExportHistory({
       } else {
         const link = document.createElement("a");
         link.href = body.url;
-        link.download = "demopop-redesign.mp4";
+        link.download =
+          job.output_kind === "launch-pack"
+            ? "demopop-launch-package.zip"
+            : "demopop-redesign.mp4";
         link.click();
       }
     } catch (failure) {
@@ -133,7 +138,15 @@ export function ExportHistory({
                 {job.created_at
                   ? new Date(job.created_at).toLocaleString()
                   : "Recent export"}{" "}
-                · {job.format === "landscape" ? "Landscape" : "Vertical"} ·{" "}
+                ·{" "}
+                {job.output_kind === "launch-pack"
+                  ? "Launch package"
+                  : job.format === "landscape"
+                    ? "Landscape"
+                    : job.format === "square"
+                      ? "Square"
+                      : "Vertical"}{" "}
+                · {job.duration ?? 15}s ·{" "}
                 {TEMPLATES.find((t) => t.id === job.template)?.name ||
                   "Classic Reveal"}
               </p>
@@ -145,7 +158,9 @@ export function ExportHistory({
                 disabled={busy === job.id}
                 onClick={() => void action(job)}
               >
-                Download MP4
+                {job.output_kind === "launch-pack"
+                  ? "Download ZIP"
+                  : "Download MP4"}
               </button>
             )}
             {job.status === "failed" && job.attempt_count < 3 && (

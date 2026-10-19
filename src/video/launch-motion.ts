@@ -218,3 +218,68 @@ export function launchShotGeometry(
     top: base.top * amount + height * y * (1 - amount),
   };
 }
+
+/** Keep additional automatic punch-ins modest on tall and panoramic sources. */
+export function launchDetailZoom(
+  media: Pick<Media, "width" | "height">,
+  zoom: number,
+) {
+  const aspect = media.width / media.height;
+  const weight = aspect < 1 ? 0 : aspect > 2.4 ? 0.2 : 1;
+  return 1 + (zoom - 1) * weight;
+}
+
+/**
+ * Each custom shot selects the source independently. Blend covering geometries,
+ * rather than crop coordinates, so zoom changes never expose an image edge.
+ * Missing settings preserve the original automatic camera exactly.
+ */
+export function launchAfterGeometry(
+  media: Pick<Media, "width" | "height">,
+  project: Pick<
+    ProjectInput,
+    "afterCrop" | "highlight1Crop" | "highlight2Crop"
+  >,
+  width: number,
+  height: number,
+  frame: number,
+  zoom = 1,
+  anchorX = 0.5,
+  anchorY = 0.5,
+) {
+  const automatic = launchShotGeometry(
+    media,
+    project.afterCrop,
+    width,
+    height,
+    launchDetailZoom(media, zoom),
+    anchorX,
+    anchorY,
+  );
+  if (!project.highlight1Crop && !project.highlight2Crop) return automatic;
+  const blend = (start: number, end: number) => {
+    const t = Math.max(0, Math.min(1, (frame - start) / (end - start)));
+    return t * t * (3 - 2 * t);
+  };
+  const second = blend(LAUNCH_BEATS.highlight2, LAUNCH_BEATS.highlight2 + 20);
+  const first = blend(LAUNCH_BEATS.highlight1, LAUNCH_BEATS.highlight1 + 22);
+  const firstWeight = project.highlight1Crop ? first * (1 - second) : 0;
+  const secondWeight = project.highlight2Crop ? second : 0;
+  if (firstWeight === 0 && secondWeight === 0) return automatic;
+  const firstShot = project.highlight1Crop
+    ? coverGeometry(media, project.highlight1Crop, width, height)
+    : automatic;
+  const secondShot = project.highlight2Crop
+    ? coverGeometry(media, project.highlight2Crop, width, height)
+    : automatic;
+  if (firstWeight === 1) return firstShot;
+  if (secondWeight === 1) return secondShot;
+  const geometry = { ...automatic };
+  for (const key of Object.keys(geometry) as (keyof typeof geometry)[]) {
+    geometry[key] =
+      automatic[key] * (1 - firstWeight - secondWeight) +
+      firstShot[key] * firstWeight +
+      secondShot[key] * secondWeight;
+  }
+  return geometry;
+}

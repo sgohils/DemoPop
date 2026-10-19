@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { randomBytes } from "node:crypto";
 import {
   projectSchema,
   MAX_UPLOAD,
@@ -7,6 +8,7 @@ import {
   type Media,
   type ProjectInput,
   brandKitSchema,
+  projectAssetIds,
 } from "../../../shared/project";
 import {
   adminClient,
@@ -14,7 +16,13 @@ import {
   userClient,
 } from "../../../server/supabase";
 import { normalizeImage } from "../../../server/images";
+import { prepareClip } from "../../../server/clips";
+import { publicReview, reviewTokenHash } from "../../../server/review-api";
 import { owned, safeStoragePath } from "../../../server/access";
+import {
+  isSameOriginRequest,
+  requestOrigin,
+} from "../../../server/request-origin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 class HttpError extends Error {
@@ -40,18 +48,22 @@ async function handle(
   { params }: { params: Promise<{ path: string[] }> },
 ) {
   try {
+    const segments = (await params).path;
+    const [kind, id, action] = segments;
+    if (
+      kind === "reviews" &&
+      id &&
+      !action &&
+      ["GET", "POST"].includes(req.method)
+    )
+      return publicReview(req, id);
     if (!cloudConfigured())
       throw new HttpError(
         503,
         "Cloud features are unavailable until Supabase is configured. You can edit and preview locally.",
       );
-    if (
-      req.method !== "GET" &&
-      req.headers.get("origin") !== req.nextUrl.origin
-    )
+    if (req.method !== "GET" && !isSameOriginRequest(req))
       throw new HttpError(403, "Request origin is not allowed.");
-    const segments = (await params).path;
-    const [kind, id, action] = segments;
     const supabase = await userClient();
     if (kind === "auth" && req.method === "POST") {
       if (id === "recover") {
@@ -60,7 +72,7 @@ async function handle(
           .strict()
           .parse(await req.json());
         const result = await supabase.auth.resetPasswordForEmail(body.email, {
-          redirectTo: `${req.nextUrl.origin}/auth/confirm?next=/auth/reset`,
+          redirectTo: `${requestOrigin(req)}/auth/confirm?next=/auth/reset`,
         });
         if (result.error)
           throw new HttpError(
@@ -100,29 +112,43 @@ async function handle(
         .object({
           email: z.email().max(254),
           password: z.string().min(8).max(128),
+          next: z.literal("/create").optional(),
         })
         .strict()
         .parse(await req.json());
       const result =
         id === "signup"
           ? await supabase.auth.signUp({
-              ...body,
+              email: body.email,
+              password: body.password,
               options: {
-                emailRedirectTo: `${req.nextUrl.origin}/auth/confirm`,
+                emailRedirectTo: `${requestOrigin(req)}/auth/confirm${body.next === "/create" ? "?next=%2Fcreate" : ""}`,
               },
             })
           : id === "login"
-            ? await supabase.auth.signInWithPassword(body)
+            ? await supabase.auth.signInWithPassword({
+                email: body.email,
+                password: body.password,
+              })
             : null;
       if (!result) throw new HttpError(404, "Not found.");
       if (result.error) throw new HttpError(400, result.error.message);
-      return NextResponse.json({
+      const response = NextResponse.json({
         signedIn: Boolean(result.data.session),
         userId: result.data.session ? result.data.user?.id : undefined,
         message: result.data.session
           ? "Signed in."
           : "Check your email to confirm your account, then sign in.",
       });
+      if (id === "signup" && !result.data.session && body.next === "/create")
+        response.cookies.set("demopop-auth-next", "/create", {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: req.nextUrl.protocol === "https:",
+          path: "/auth/confirm",
+          maxAge: 3600,
+        });
+      return response;
     }
     const {
       data: { user },
@@ -145,9 +171,7 @@ async function handle(
         throw new HttpError(429, "Too many requests. Please try again later.");
     }
     async function validateAssets(p: ProjectInput) {
-      for (const assetId of [p.before, p.after, p.logo].filter(
-        Boolean,
-      ) as string[]) {
+      for (const assetId of projectAssetIds(p)) {
         if (sampleAsset(assetId)) continue;
         const { data, error } = await supabase
           .from("assets")
@@ -156,6 +180,14 @@ async function handle(
           .maybeSingle();
         check(error);
         owned(data, owner);
+        if (
+          [p.before, p.after, p.logo].includes(assetId) &&
+          data?.kind === "video"
+        )
+          throw new HttpError(
+            400,
+            "Use still images for the main screenshots and logo. Add video clips to story scenes.",
+          );
       }
     }
     async function resolveAsset(assetId: string): Promise<Media> {
@@ -178,7 +210,94 @@ async function handle(
         src: signed.data!.signedUrl,
         width: asset.width,
         height: asset.height,
+        ...(asset.kind === "video"
+          ? { kind: "video" as const, duration: asset.duration }
+          : {}),
       };
+    }
+    if (kind === "recipes") {
+      if (!id && req.method === "GET") {
+        const result = await supabase
+          .from("launch_recipes")
+          .select("id,name,settings,updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(100);
+        check(result.error);
+        return NextResponse.json({ recipes: result.data || [] });
+      }
+      if (id) {
+        const found = await supabase
+          .from("launch_recipes")
+          .select("*")
+          .eq("id", uuid(id))
+          .maybeSingle();
+        check(found.error);
+        owned(found.data, owner);
+        if (req.method === "DELETE") {
+          await limit("recipe", 30);
+          check(
+            (
+              await admin
+                .from("launch_recipes")
+                .delete()
+                .eq("id", id)
+                .eq("owner_id", owner)
+            ).error,
+          );
+          return NextResponse.json({ ok: true });
+        }
+      }
+      if ((!id && req.method === "POST") || (id && req.method === "PUT")) {
+        await limit("recipe", 30);
+        const body = z
+          .object({
+            name: z.string().trim().min(1).max(60),
+            project: projectSchema,
+          })
+          .strict()
+          .parse(await req.json());
+        await validateAssets(body.project);
+        const record = {
+          owner_id: owner,
+          name: body.name,
+          settings: body.project,
+        };
+        const result = id
+          ? await admin
+              .from("launch_recipes")
+              .update(record)
+              .eq("id", id)
+              .eq("owner_id", owner)
+              .select("id")
+              .single()
+          : await admin
+              .from("launch_recipes")
+              .insert(record)
+              .select("id")
+              .single();
+        check(result.error);
+        return NextResponse.json(result.data);
+      }
+    }
+    if (kind === "reviews" && id && req.method === "DELETE") {
+      const found = await supabase
+        .from("review_links")
+        .select("owner_id")
+        .eq("id", uuid(id))
+        .maybeSingle();
+      check(found.error);
+      owned(found.data, owner);
+      await limit("review-manage", 60);
+      check(
+        (
+          await admin
+            .from("review_links")
+            .update({ revoked_at: new Date().toISOString() })
+            .eq("id", id)
+            .eq("owner_id", owner)
+        ).error,
+      );
+      return NextResponse.json({ ok: true });
     }
     if (kind === "brand-kits") {
       if (!id && req.method === "GET") {
@@ -261,6 +380,8 @@ async function handle(
             deleted_at: p.deleted_at,
             template: projectSchema.parse(p.settings).template,
             format: projectSchema.parse(p.settings).format,
+            client: projectSchema.parse(p.settings).client || "",
+            duration: projectSchema.parse(p.settings).story?.duration ?? 15,
           })),
         });
       }
@@ -319,6 +440,70 @@ async function handle(
           404,
           "This project is in the trash. Restore it from Projects.",
         );
+      if (action === "reviews") {
+        if (req.method === "GET") {
+          const result = await supabase
+            .from("review_links")
+            .select(
+              "id,token,agency_name,status,approved_by,approved_at,expires_at,revoked_at,created_at,job_id,allow_download,review_comments(id,author,body,seconds,created_at),render_jobs!inner(project_id)",
+            )
+            .eq("owner_id", owner)
+            .eq("render_jobs.project_id", projectId)
+            .order("created_at", { ascending: false })
+            .limit(100);
+          check(result.error);
+          return NextResponse.json({
+            reviews: (result.data || []).map((review) => ({
+              ...review,
+              url: `${requestOrigin(req)}/review/${review.token}`,
+              token: undefined,
+              render_jobs: undefined,
+            })),
+          });
+        }
+        if (req.method === "POST") {
+          await limit("review-manage", 30);
+          const body = z
+            .object({
+              jobId: z.uuid(),
+              agencyName: z.string().trim().min(1).max(60),
+              allowDownload: z.boolean().default(false),
+            })
+            .strict()
+            .parse(await req.json());
+          const job = await supabase
+            .from("render_jobs")
+            .select("id,status,output_path")
+            .eq("id", body.jobId)
+            .eq("project_id", projectId)
+            .eq("owner_id", owner)
+            .maybeSingle();
+          check(job.error);
+          if (!job.data?.output_path || job.data.status !== "completed")
+            throw new HttpError(
+              409,
+              "Choose a completed, available export first.",
+            );
+          const token = randomBytes(32).toString("hex");
+          const result = await admin
+            .from("review_links")
+            .insert({
+              owner_id: owner,
+              job_id: body.jobId,
+              token,
+              token_hash: reviewTokenHash(token),
+              agency_name: body.agencyName,
+              allow_download: body.allowDownload,
+            })
+            .select("id")
+            .single();
+          check(result.error);
+          return NextResponse.json({
+            id: result.data!.id,
+            url: `${requestOrigin(req)}/review/${token}`,
+          });
+        }
+      }
       if (action === "exports" && req.method === "GET") {
         const offset = z.coerce
           .number()
@@ -329,7 +514,7 @@ async function handle(
         const result = await supabase
           .from("render_jobs")
           .select(
-            "id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at",
+            "id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at,output_kind",
           )
           .eq("project_id", projectId)
           .order("created_at", { ascending: false })
@@ -343,6 +528,7 @@ async function handle(
             snapshot: undefined,
             format: snapshot.format,
             template: snapshot.template,
+            duration: snapshot.story?.duration ?? 15,
           };
         });
         return NextResponse.json({
@@ -355,7 +541,7 @@ async function handle(
         const latest = await supabase
           .from("render_jobs")
           .select(
-            "id,status,progress,attempt_count,error,snapshot,output_expired_at",
+            "id,status,progress,attempt_count,error,snapshot,output_expired_at,output_kind",
           )
           .eq("project_id", projectId)
           .order("created_at", { ascending: false })
@@ -370,12 +556,23 @@ async function handle(
                 snapshot: undefined,
                 format: projectSchema.parse(latest.data.snapshot).format,
                 template: projectSchema.parse(latest.data.snapshot).template,
+                duration:
+                  projectSchema.parse(latest.data.snapshot).story?.duration ??
+                  15,
               }
             : null,
           media: {
             before: await resolveAsset(p.before),
             after: await resolveAsset(p.after),
             logo: p.logo ? await resolveAsset(p.logo) : null,
+            sceneMedia: Object.fromEntries(
+              await Promise.all(
+                (p.story?.scenes ?? []).map(
+                  async (scene) =>
+                    [scene.asset, await resolveAsset(scene.asset)] as const,
+                ),
+              ),
+            ),
           },
         });
       }
@@ -421,16 +618,20 @@ async function handle(
         }
         let image;
         try {
-          image = await normalizeImage(Buffer.concat(chunks));
+          const bytes = Buffer.concat(chunks);
+          image =
+            bytes.toString("ascii", 4, 8) === "ftyp"
+              ? await prepareClip(bytes)
+              : await normalizeImage(bytes);
         } catch (e) {
           throw new HttpError(400, (e as Error).message);
         }
         const assetId = crypto.randomUUID(),
-          path = `${owner}/${assetId}.webp`;
+          path = `${owner}/${assetId}.${"kind" in image ? "mp4" : "webp"}`;
         const uploaded = await admin.storage
           .from("inputs")
           .upload(path, image.data, {
-            contentType: "image/webp",
+            contentType: "kind" in image ? "video/mp4" : "image/webp",
             upsert: false,
           });
         check(uploaded.error);
@@ -440,6 +641,8 @@ async function handle(
           path,
           width: image.width,
           height: image.height,
+          kind: "kind" in image ? "video" : "image",
+          duration: "duration" in image ? image.duration : null,
         });
         if (inserted.error) {
           await admin.storage.from("inputs").remove([path]);
@@ -454,7 +657,11 @@ async function handle(
     if (kind === "exports" && req.method === "POST") {
       await limit("export", 30);
       const body = z
-        .object({ projectId: z.uuid(), project: projectSchema })
+        .object({
+          projectId: z.uuid(),
+          project: projectSchema,
+          outputKind: z.enum(["video", "launch-pack"]).default("video"),
+        })
         .strict()
         .parse(await req.json());
       await validateAssets(body.project);
@@ -465,11 +672,12 @@ async function handle(
         .maybeSingle();
       check(row.error);
       owned(row.data, owner);
-      const result = await admin.rpc("enqueue_render_with_result", {
+      const result = await admin.rpc("enqueue_output_with_result", {
         p_owner: owner,
         p_project: body.projectId,
         p_settings: body.project,
         p_daily_cap: Number(process.env.DAILY_EXPORT_CAP || 10),
+        p_kind: body.outputKind,
       });
       if (result.error) {
         if (result.error.message.includes("Daily"))
@@ -480,7 +688,11 @@ async function handle(
         check(result.error);
       }
       const queued = z
-        .object({ id: z.uuid(), reused: z.boolean() })
+        .object({
+          id: z.uuid(),
+          reused: z.boolean(),
+          outputKind: z.enum(["video", "launch-pack"]),
+        })
         .safeParse(result.data);
       if (!queued.success)
         throw new HttpError(
@@ -494,7 +706,7 @@ async function handle(
       const result = await supabase
         .from("render_jobs")
         .select(
-          "id,owner_id,project_id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at",
+          "id,owner_id,project_id,status,progress,attempt_count,error,created_at,snapshot,output_expired_at,output_kind",
         )
         .eq("id", jobId)
         .maybeSingle();
@@ -506,6 +718,7 @@ async function handle(
         snapshot: undefined,
         format: snapshot.format,
         template: snapshot.template,
+        duration: snapshot.story?.duration ?? 15,
       };
       if (action === "retry" && req.method === "POST") {
         await limit("retry", 10);
@@ -540,7 +753,12 @@ async function handle(
           throw new HttpError(404, "Not found.");
         const signed = await admin.storage
           .from("exports")
-          .createSignedUrl(path, 60, { download: "demopop-redesign.mp4" });
+          .createSignedUrl(path, 60, {
+            download:
+              row.output_kind === "launch-pack"
+                ? "demopop-launch-package.zip"
+                : "demopop-redesign.mp4",
+          });
         check(signed.error);
         return NextResponse.json({ url: signed.data!.signedUrl });
       }
@@ -575,6 +793,7 @@ async function route(
   const response = await handle(req, context);
   response.headers.set("Cache-Control", "private, no-store");
   response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "no-referrer");
   return response;
 }
 export { route as GET, route as POST, route as PUT, route as DELETE };

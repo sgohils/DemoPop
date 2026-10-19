@@ -1,0 +1,338 @@
+.studio-editor .inspector-nav {
+  flex-wrap: wrap;
+}
+.studio-editor .kit-panel {
+  border: 1px solid #dfe4ee;
+  border-radius: 8px;
+  background: #f8faff;
+  margin: 14px 0;
+}
+.studio-editor .kit-panel-toggle {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  width: 100%;
+  padding: 13px;
+  color: #3d5db9;
+  font-size: 11px;
+  text-align: left;
+}
+.studio-editor .kit-panel-toggle > span:last-child {
+  margin-left: auto;
+}
+.studio-editor .kit-panel-body {
+  padding: 0 12px 14px;
+}
+.studio-editor .kit-panel-body .field {
+  margin-top: 13px;
+}
+.studio-editor .kit-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.studio-editor .kit-segment {
+  display: flex;
+  background: #f0f3f8;
+  border: 1px solid #e0e5ef;
+  padding: 4px;
+  border-radius: 7px;
+  margin: 8px 0 12px;
+  gap: 4px;
+}
+.studio-editor .kit-segment button {
+  flex: 1;
+  font-size: 11px;
+  padding: 9px 6px;
+  color: #737f94;
+  border-radius: 4px;
+}
+.studio-editor .kit-segment [aria-pressed="true"] {
+  color: #3559c6;
+  background: white;
+  box-shadow: 0 1px 4px #1721260c;
+}
+.studio-editor .story-builder {
+  margin-bottom: 20px;
+}
+.studio-editor .story-cards {
+  display: grid;
+  gap: 14px;
+  margin: 16px 0;
+}
+.studio-editor .story-card {
+  min-width: 0;
+  border: 1px solid #dfe4ee;
+  border-radius: 8px;
+  background: #fcfcfe;
+  padding: 12px;
+}
+.studio-editor .story-card-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.studio-editor .story-card-heading > .text-link {
+  font-size: 10px;
+  color: #365ddb;
+}
+.studio-editor .story-card-heading > span {
+  font-size: 9px;
+  color: #8390a5;
+}
+.studio-editor .story-card-heading > div {
+  margin-left: auto;
+  display: flex;
+  gap: 3px;
+}
+.studio-editor .story-card-heading > div button {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 28px;
+  color: #7d889b;
+  border-radius: 4px;
+}
+.studio-editor .story-card-heading > div button:disabled {
+  opacity: 0.28;
+}
+.studio-editor .story-media {
+  position: relative;
+  overflow: hidden;
+  background: #e5e8f0;
+  border: 1px solid #dce1eb;
+  border-radius: 5px;
+}
+.studio-editor .story-media > img,
+.studio-editor .story-media > video {
+  position: absolute;
+  max-width: none;
+}
+.studio-editor .story-replace {
+  position: absolute;
+  bottom: 7px;
+  right: 7px;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  padding: 7px;
+  border-radius: 4px;
+  background: #182236e6;
+  color: #fff;
+  font-size: 9px;
+  cursor: pointer;
+}
+.studio-editor .story-replace input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+.studio-editor .story-replace:focus-within {
+  outline: 2px solid #7da0ff;
+  outline-offset: 2px;
+}
+.studio-editor .story-card .field {
+  margin-top: 12px;
+}
+.studio-editor .story-inline-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 9px;
+}
+.studio-editor .story-inline-fields .field select {
+  padding: 9px 7px;
+  font-size: 10px;
+  width: 100%;
+  min-width: 0;
+}
+.studio-editor .story-card details {
+  margin-top: 12px;
+  font-size: 10px;
+  color: #748199;
+}
+.studio-editor .story-card summary {
+  cursor: pointer;
+  padding: 5px 0;
+}
+.studio-editor .story-card details .crop-controls {
+  padding-top: 12px;
+}
+.studio-editor .story-card .crop-controls input {
+  width: 100%;
+}
+.studio-editor .import-captures {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin: 16px 0;
+}
+.studio-editor .import-captures img {
+  width: 100%;
+  height: 94px;
+  object-fit: cover;
+  object-position: top;
+  border-radius: 4px;
+  border: 1px solid #dfe4ee;
+}
+.studio-editor .import-captures small {
+  display: block;
+  font-size: 8px;
+  color: #7f8b9e;
+  line-height: 1.5;
+  margin-top: 5px;
+}
+.studio-editor .recipe-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+}
+.studio-editor .recipe-list li {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0;
+  border-top: 1px solid #e7eaf1;
+}
+.studio-editor .recipe-list li > div {
+  flex: 1;
+  min-width: 0;
+}
+.studio-editor .recipe-list strong {
+  display: block;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.studio-editor .recipe-list small {
+  display: block;
+  color: #8792a5;
+  font-size: 9px;
+  margin-top: 4px;
+}
+.studio-editor .recipe-list button {
+  font-size: 10px;
+  color: #6a7891;
+  min-height: 30px;
+  min-width: 22px;
+}
+.studio-editor .recipe-list .text-link {
+  color: #365ddb;
+  gap: 4px;
+}
+.studio-editor .package-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #f2f5ff;
+  border: 1px solid #dee6ff;
+  padding: 15px 12px;
+  border-radius: 7px;
+  margin: 18px 0;
+  color: #365ddb;
+}
+.studio-editor .package-summary strong {
+  font-size: 12px;
+}
+.studio-editor .package-summary p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #7484a2;
+  margin: 6px 0 0;
+}
+.studio-editor .launch-delivery h3 {
+  font-size: 13px;
+  margin: 22px 0 10px;
+}
+.studio-editor .launch-delivery hr {
+  border: 0;
+  border-top: 1px solid #e5e9f1;
+  margin-top: 24px;
+}
+.studio-editor .kit-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 10px;
+  color: #75829a;
+  margin: 14px 0;
+  line-height: 1.6;
+}
+.studio-editor .kit-checkbox input {
+  width: 14px;
+  height: 14px;
+  margin-top: 2px;
+  accent-color: #365ddb;
+}
+.studio-editor .review-links article {
+  margin-top: 16px;
+  padding: 12px;
+  border: 1px solid #e0e5ef;
+  border-radius: 7px;
+  background: #fcfcfe;
+}
+.studio-editor .review-link-heading {
+  margin-bottom: 10px;
+}
+.studio-editor .review-link-heading strong {
+  display: block;
+  text-transform: capitalize;
+  font-size: 11px;
+  color: #526881;
+}
+.studio-editor .review-link-heading small {
+  font-size: 9px;
+  color: #8a96a8;
+}
+.studio-editor .review-links input {
+  display: block;
+  width: 100%;
+  border: 1px solid #dce2ed;
+  border-radius: 5px;
+  padding: 8px;
+  font-size: 10px;
+  background: white;
+}
+.studio-editor .review-links .text-link {
+  font-size: 9px;
+  gap: 4px;
+}
+.studio-editor .review-links blockquote {
+  padding: 10px 0 0;
+  margin: 12px 0 0;
+  border-top: 1px solid #e7ebf2;
+  font-size: 10px;
+}
+.studio-editor .review-links blockquote strong {
+  font-size: 9px;
+  color: #63768f;
+}
+.studio-editor .review-links blockquote p {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  margin: 5px 0;
+}
+.studio-editor .editor-stage .square .video-shell {
+  aspect-ratio: 1;
+  width: clamp(260px, calc(100dvh - 390px), 650px);
+}
+@media (max-width: 800px) {
+  .studio-editor .kit-segment button {
+    min-height: 38px;
+  }
+  .studio-editor .story-card-heading > div button {
+    width: 30px;
+    height: 36px;
+  }
+  .studio-editor .story-replace {
+    min-height: 34px;
+  }
+  .studio-editor .editor-stage .square .video-shell {
+    width: min(100%, 390px);
+  }
+}

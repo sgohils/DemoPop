@@ -20,6 +20,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import "./editor.css";
+import "./launch-tools.css";
 import { Brand } from "./Brand";
 import { Preview } from "./Preview";
 import { EditorSignIn } from "./EditorSignIn";
@@ -32,9 +33,16 @@ import { removeDraft, type Draft, type DraftAssets } from "../client/drafts";
 import { useProjectHistory } from "../client/use-project-history";
 import { BrandColor } from "./BrandColor";
 import { MotionControls } from "./MotionControls";
+import { HighlightFocus } from "./HighlightFocus";
+import { StoryEditor } from "./StoryEditor";
+import { WebsiteImport } from "./WebsiteImport";
+import { RecipeLibrary } from "./RecipeLibrary";
+import { LaunchDelivery } from "./LaunchDelivery";
+import { localMedia } from "../client/media";
+import type { WebsiteImport as WebsiteResult } from "../server/website-import";
+import type { OutputKind } from "../shared/launch-kit";
 import {
   sampleProject,
-  sampleMedia,
   sampleAsset,
   SAMPLE_ASSETS,
   newProject,
@@ -48,6 +56,7 @@ import {
   TEMPLATES,
   FONTS,
   videoSettings,
+  projectAssetIds,
 } from "../shared/project";
 import { videoScenes } from "../shared/scenes";
 type Job = HistoryJob;
@@ -97,6 +106,7 @@ export function Editor({
     before: sampleAsset(initialProject.before)!,
     after: sampleAsset(initialProject.after)!,
     logo: null as Media | null,
+    sceneMedia: {} as Record<string, Media>,
   }));
   const assetCatalog = useRef(
     new Map<string, Media>(
@@ -146,6 +156,9 @@ export function Editor({
     dirty &&
     (!!id || JSON.stringify(project) !== JSON.stringify(initialProject));
   const dimensions = videoSettings(project);
+  const storyAssetKey = JSON.stringify(
+    project.story?.scenes.map((scene) => scene.asset) ?? [],
+  );
   const draftScope = configured ? userId : "local";
   const projectRef = useRef(project);
   projectRef.current = project;
@@ -154,6 +167,8 @@ export function Editor({
     assetCatalog.current.set(project.after, media.after);
     if (project.logo && media.logo)
       assetCatalog.current.set(project.logo, media.logo);
+    for (const [asset, source] of Object.entries(media.sceneMedia ?? {}))
+      assetCatalog.current.set(asset, source);
   }, [project.before, project.after, project.logo, media]);
   function moveHistory(direction: "undo" | "redo") {
     const target = direction === "undo" ? history.previous : history.next;
@@ -162,6 +177,13 @@ export function Editor({
       before: assetCatalog.current.get(target.before) || media.before,
       after: assetCatalog.current.get(target.after) || media.after,
       logo: target.logo ? assetCatalog.current.get(target.logo) || null : null,
+      sceneMedia: Object.fromEntries(
+        (target.story?.scenes ?? []).flatMap((scene) => {
+          const source =
+            assetCatalog.current.get(scene.asset) || sampleAsset(scene.asset);
+          return source ? [[scene.asset, source]] : [];
+        }),
+      ),
     });
     history[direction]();
     setNotice("");
@@ -189,8 +211,7 @@ export function Editor({
   });
   function showScene(name: string) {
     const frame =
-      videoScenes(project.template).find((scene) => scene.name === name)
-        ?.preview || 0;
+      videoScenes(project).find((scene) => scene.name === name)?.preview || 0;
     setFocusFrame((value) => ({ frame, request: (value?.request || 0) + 1 }));
   }
   useUnsavedChanges(!loading && !loadError && draftDirty);
@@ -307,7 +328,7 @@ export function Editor({
         loadedId.current = initialId;
         setId(initialId);
         resetProject(data.project);
-        setMedia(data.media);
+        setMedia({ ...data.media, sceneMedia: data.media.sceneMedia || {} });
         setSaved(JSON.stringify(data.project));
         if (data.job) setJob(data.job);
       })
@@ -366,12 +387,31 @@ export function Editor({
         before: project.before,
         after: project.after,
         logo: project.logo,
+        ...Object.fromEntries(
+          (JSON.parse(storyAssetKey) as string[]).map((asset) => [
+            `scene:${asset}`,
+            asset,
+          ]),
+        ),
       },
       fetchMedia: (asset, signal) =>
         api(`assets/${asset}`, "GET", undefined, signal),
       onMedia: (key, asset, value) => {
-        if (projectRef.current[key] === asset)
+        if (
+          (key === "before" || key === "after" || key === "logo") &&
+          projectRef.current[key] === asset
+        )
           setMedia((m) => ({ ...m, [key]: value }));
+        else if (
+          key.startsWith("scene:") &&
+          projectRef.current.story?.scenes.some(
+            (scene) => scene.asset === asset,
+          )
+        )
+          setMedia((m) => ({
+            ...m,
+            sceneMedia: { ...m.sceneMedia, [asset]: value },
+          }));
       },
       onError: (failure) => {
         if (epoch !== authEpoch.current) return;
@@ -402,40 +442,39 @@ export function Editor({
       window.removeEventListener("focus", refresh);
       document.removeEventListener("visibilitychange", visible);
     };
-  }, [configured, project.before, project.after, project.logo, mediaVersion]);
+  }, [
+    configured,
+    project.before,
+    project.after,
+    project.logo,
+    storyAssetKey,
+    mediaVersion,
+  ]);
   async function restoreDraft(draft: Draft) {
     try {
-      const restored = sampleMedia();
-      for (const key of ["before", "after", "logo"] as const) {
-        const asset = draft.project[key];
-        if (!asset) {
-          if (key === "logo") restored.logo = null;
-          continue;
-        }
+      const sources = new Map<string, Media>();
+      for (const asset of projectAssetIds(draft.project)) {
         const local = draft.assets[asset];
         if (local) {
           if (!(local.blob instanceof Blob) || local.blob.size > MAX_UPLOAD)
             throw new Error("Draft image is invalid.");
-          const bitmap = await createImageBitmap(local.blob);
-          if (
-            bitmap.width < 64 ||
-            bitmap.height < 64 ||
-            bitmap.width * bitmap.height > 40_000_000
-          ) {
-            bitmap.close();
-            throw new Error("Draft image is invalid.");
-          }
-          const src = URL.createObjectURL(local.blob);
-          objectUrls.current.push(src);
-          restored[key] = { src, width: bitmap.width, height: bitmap.height };
-          bitmap.close();
-        } else if (sampleAsset(asset)) restored[key] = sampleAsset(asset)!;
-        else if (configured) restored[key] = await api(`assets/${asset}`);
+          const source = await localMedia(local.blob);
+          objectUrls.current.push(source.src);
+          sources.set(asset, source);
+        } else if (sampleAsset(asset)) sources.set(asset, sampleAsset(asset)!);
+        else if (configured) sources.set(asset, await api(`assets/${asset}`));
         else throw new Error("Draft image is unavailable.");
       }
-      setLocalAssets(draft.assets);
-      setMedia(restored);
-      setProject(draft.project);
+      for (const [asset, source] of sources)
+        assetCatalog.current.set(asset, source);
+      setLocalAssets((current) => ({ ...current, ...draft.assets }));
+      setMedia({
+        before: sources.get(draft.project.before)!,
+        after: sources.get(draft.project.after)!,
+        logo: draft.project.logo ? sources.get(draft.project.logo)! : null,
+        sceneMedia: Object.fromEntries(sources),
+      });
+      history.apply(draft.project);
       setNotice("Browser draft restored.");
     } catch (failure) {
       reportFailure(failure);
@@ -509,7 +548,7 @@ export function Editor({
       setSaving(false);
     }
   }
-  async function startExport() {
+  async function startExport(outputKind: OutputKind = "video") {
     const epoch = authEpoch.current;
     setExporting(true);
     setError("");
@@ -528,7 +567,11 @@ export function Editor({
           `/editor/${projectId}`,
         );
       }
-      const data = await api("exports", "POST", { projectId, project: p });
+      const data = await api("exports", "POST", {
+        projectId,
+        project: p,
+        outputKind,
+      });
       setProject((current) =>
         JSON.stringify(current) === JSON.stringify(project) ? p : current,
       );
@@ -540,12 +583,141 @@ export function Editor({
       setNotice(
         data.reused
           ? "Showing the existing export with its earlier captured settings. Your submitted settings are saved for your next export."
-          : "Export started. Later edits apply to your next export.",
+          : outputKind === "launch-pack"
+            ? "Launch package started: 9 videos, a thumbnail, and manifest. Later edits apply to your next package."
+            : "Export started. Later edits apply to your next export.",
       );
     } catch (e) {
       reportFailure(e, epoch);
     } finally {
       setExporting(false);
+    }
+  }
+  async function registerMedia(
+    file: File,
+  ): Promise<{ id: string; media: Media }> {
+    const epoch = authEpoch.current;
+    if (file.size > MAX_UPLOAD)
+      throw new Error("Choose a file smaller than 10 MB.");
+    if (
+      !["image/png", "image/jpeg", "image/webp", "video/mp4"].includes(
+        file.type,
+      )
+    )
+      throw new Error("Choose a PNG, JPEG, WebP or H.264 MP4.");
+    let source: Media, assetId: string;
+    if (configured) {
+      const response = await fetch("/api/assets", {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        const failure = new ApiError(
+          data.error || "Upload could not finish.",
+          response.status,
+        );
+        handleAuthFailure(failure, epoch);
+        throw failure;
+      }
+      source = data.media;
+      assetId = data.id;
+    } else {
+      source = await localMedia(file);
+      assetId = crypto.randomUUID();
+      objectUrls.current.push(source.src);
+      setLocalAssets((current) => ({
+        ...current,
+        [assetId]: { blob: file, width: source.width, height: source.height },
+      }));
+    }
+    assetCatalog.current.set(assetId, source);
+    return { id: assetId, media: source };
+  }
+  async function uploadStory(file: File) {
+    setUploading("story");
+    try {
+      const result = await registerMedia(file);
+      setMedia((current) => ({
+        ...current,
+        sceneMedia: { ...current.sceneMedia, [result.id]: result.media },
+      }));
+      return result;
+    } finally {
+      setUploading(null);
+    }
+  }
+  async function applyWebsite(result: WebsiteResult) {
+    setUploading("website");
+    try {
+      const captures: { id: string; media: Media; caption: string }[] = [];
+      for (const capture of result.captures) {
+        if (!capture.image.startsWith("data:image/png;base64,"))
+          throw new Error("The imported image could not be prepared.");
+        const file = new File(
+          [await (await fetch(capture.image)).blob()],
+          `${capture.name}.png`,
+          { type: "image/png" },
+        );
+        captures.push({
+          ...(await registerMedia(file)),
+          caption: capture.caption,
+        });
+      }
+      if (captures.length < 3 || captures.length > 6)
+        throw new Error("The import needs three to six captures.");
+      let logo: { id: string; media: Media } | null = null;
+      if (result.logo?.startsWith("data:image/png;base64,"))
+        logo = await registerMedia(
+          new File([await (await fetch(result.logo)).blob()], "logo.png", {
+            type: "image/png",
+          }),
+        );
+      setMedia((current) => ({
+        ...current,
+        before: captures[0].media,
+        after: captures[0].media,
+        logo: logo?.media ?? null,
+        sceneMedia: Object.fromEntries(
+          captures.map((capture) => [capture.id, capture.media]),
+        ),
+      }));
+      setProject((current) => ({
+        ...current,
+        name: result.name,
+        template: "launch",
+        font: result.font,
+        color: result.color,
+        opening: result.opening,
+        cta: result.cta,
+        before: captures[0].id,
+        after: captures[0].id,
+        logo: logo?.id ?? null,
+        beforeCrop: { ...defaultCrop },
+        afterCrop: { ...defaultCrop },
+        highlight1Crop: null,
+        highlight2Crop: null,
+        hooks: undefined,
+        url: new URL(result.url).hostname.slice(0, 80),
+        sourceUrl: result.url,
+        story: {
+          duration: 30,
+          scenes: captures.map((capture) => ({
+            id: crypto.randomUUID(),
+            asset: capture.id,
+            caption: capture.caption,
+            crop: { ...defaultCrop },
+            weight: 3,
+            trimStart: 0,
+          })),
+        },
+      }));
+      setNotice(
+        "Website draft applied. Review the captions and framing; Undo restores your previous edit.",
+      );
+    } finally {
+      setUploading(null);
     }
   }
   async function upload(
@@ -607,6 +779,9 @@ export function Editor({
         ...p,
         [key]: assetId,
         ...(key !== "logo" ? { [`${key}Crop`]: { ...defaultCrop } } : {}),
+        ...(key === "after"
+          ? { highlight1Crop: null, highlight2Crop: null }
+          : {}),
       }));
     } catch (e) {
       reportFailure(e, epoch);
@@ -640,7 +815,10 @@ export function Editor({
       const data = await api(`jobs/${job.id}/download`);
       const a = document.createElement("a");
       a.href = data.url;
-      a.download = "demopop-redesign.mp4";
+      a.download =
+        job.output_kind === "launch-pack"
+          ? "demopop-launch-package.zip"
+          : "demopop-redesign.mp4";
       a.click();
     } catch (e) {
       handleAuthFailure(e, epoch);
@@ -660,12 +838,13 @@ export function Editor({
       <label className="field">
         <span>
           {label}
-          <small>
+          <small aria-hidden="true">
             {project[key].length}/{max}
           </small>
         </span>
         {multiline ? (
           <textarea
+            aria-label={label}
             rows={3}
             value={project[key]}
             maxLength={max}
@@ -674,6 +853,7 @@ export function Editor({
           />
         ) : (
           <input
+            aria-label={label}
             value={project[key]}
             maxLength={max}
             onChange={(e) => update(key, e.target.value)}
@@ -905,7 +1085,7 @@ export function Editor({
                 ? "MP4 export is not connected in this workspace"
                 : undefined
             }
-            onClick={startExport}
+            onClick={() => void startExport()}
           >
             {exporting ? (
               <Loader2 className="spin" size={16} />
@@ -1013,6 +1193,8 @@ export function Editor({
               ["media-settings", "Screenshots"],
               ["story-settings", "Story"],
               ["brand-settings", "Brand"],
+              ["recipes-settings", "Recipes"],
+              ["delivery-settings", "Launch kit"],
             ].map(([section, label]) => (
               <button
                 key={section}
@@ -1039,7 +1221,8 @@ export function Editor({
             {project.template === "launch" && (
               <div className="launch-settings">
                 <div className="launch-story-badge">
-                  15s LAUNCH CUT <span>HOOK → PROOF → ACTION</span>
+                  {project.story?.duration ?? 15}s LAUNCH CUT{" "}
+                  <span>HOOK → PROOF → ACTION</span>
                 </div>
                 <label className="field">
                   <span>Soundtrack</span>
@@ -1067,6 +1250,18 @@ export function Editor({
             <h2>
               <span>02</span> Your screenshots
             </h2>
+            <WebsiteImport
+              onApply={applyWebsite}
+              disabled={
+                !!uploading ||
+                saving ||
+                exporting ||
+                (configured && authenticated !== true)
+              }
+            />
+            <Link href="/create" className="text-link">
+              Create a full video from a link <ArrowUpRight size={14} />
+            </Link>
             <p className="section-hint">PNG, JPEG or WebP · up to 10 MB each</p>
             <div className="assets-grid">
               {assetCard("before")}
@@ -1082,6 +1277,8 @@ export function Editor({
                   after: current.before,
                   beforeCrop: current.afterCrop,
                   afterCrop: current.beforeCrop,
+                  highlight1Crop: null,
+                  highlight2Crop: null,
                 }));
                 setMedia((current) => ({
                   ...current,
@@ -1097,12 +1294,38 @@ export function Editor({
             <h2>
               <span>03</span> Tell the story
             </h2>
+            <StoryEditor
+              project={project}
+              media={{
+                ...Object.fromEntries(assetCatalog.current),
+                ...media.sceneMedia,
+              }}
+              onChange={(change) =>
+                setProject((current) => {
+                  const story =
+                    typeof change === "function"
+                      ? change(current.story)
+                      : change;
+                  return {
+                    ...current,
+                    story,
+                    ...(story ? { template: "launch" as const } : {}),
+                  };
+                })
+              }
+              onUpload={uploadStory}
+              onSeek={(frame) =>
+                setFocusFrame((value) => ({
+                  frame,
+                  request: (value?.request || 0) + 1,
+                }))
+              }
+            />
             {field("name", "Project name", 60)}
             {field("opening", "Opening caption", 70, true)}
             {project.template === "launch" && (
               <p className="section-hint launch-copy-hint">
-                The first 1.8 seconds: one bold idea. Give people a reason to
-                keep watching.
+                Open with one bold idea. Give people a reason to keep watching.
               </p>
             )}
             {project.template === "launch" && (
@@ -1117,7 +1340,10 @@ export function Editor({
                       "Product",
                       `Meet ${project.name.trim() || "what’s next"}.`,
                     ],
-                    ["Benefit", project.highlight1],
+                    [
+                      "Benefit",
+                      project.story?.scenes[0]?.caption ?? project.highlight1,
+                    ],
                     ["Curiosity", "What comes after\n“what if”?"],
                   ].map(([name, copy]) => (
                     <button
@@ -1134,8 +1360,40 @@ export function Editor({
                 </div>
               </div>
             )}
-            {field("highlight1", "First highlight", 48)}
-            {field("highlight2", "Second highlight", 48)}
+            {!project.story && field("highlight1", "First highlight", 48)}
+            {!project.story &&
+              project.template === "launch" &&
+              project.format !== "square" && (
+                <HighlightFocus
+                  highlight={1}
+                  value={project.highlight1Crop}
+                  baseCrop={project.afterCrop}
+                  media={media.after}
+                  format={project.format}
+                  onPreview={() => showScene("Highlight 01")}
+                  onChange={(crop) => {
+                    update("highlight1Crop", crop);
+                    showScene("Highlight 01");
+                  }}
+                />
+              )}
+            {!project.story && field("highlight2", "Second highlight", 48)}
+            {!project.story &&
+              project.template === "launch" &&
+              project.format !== "square" && (
+                <HighlightFocus
+                  highlight={2}
+                  value={project.highlight2Crop}
+                  baseCrop={project.afterCrop}
+                  media={media.after}
+                  format={project.format}
+                  onPreview={() => showScene("Highlight 02")}
+                  onChange={(crop) => {
+                    update("highlight2Crop", crop);
+                    showScene("Highlight 02");
+                  }}
+                />
+              )}
             {project.template === "launch" &&
               field("cta", "Closing call to action", 36)}
             <p className="section-hint story-hint">
@@ -1214,6 +1472,49 @@ export function Editor({
                 setAuthenticated(false);
                 sessionVersion.current++;
               }}
+            />
+          </section>
+          <section className="settings-section" id="recipes-settings">
+            <h2>
+              <span>06</span> Launch recipes
+            </h2>
+            <RecipeLibrary
+              project={project}
+              assets={localAssets}
+              scope={
+                configured ? (authenticated === true ? userId : null) : "local"
+              }
+              cloud={configured}
+              onApply={restoreDraft}
+            />
+          </section>
+          <section className="settings-section" id="delivery-settings">
+            <h2>
+              <span>07</span> Launch kit & client delivery
+            </h2>
+            <label className="field">
+              <span>
+                Client folder <small>Optional</small>
+              </span>
+              <input
+                maxLength={60}
+                placeholder="e.g. Acme Studio"
+                value={project.client || ""}
+                onChange={(event) => update("client", event.target.value)}
+              />
+            </label>
+            <p className="section-hint">
+              Projects with the same client name appear together in your
+              workspace.
+            </p>
+            <LaunchDelivery
+              project={project}
+              projectId={id}
+              authorized={authenticated === true}
+              busy={!!uploading || saving || exporting || !!activeJob}
+              revision={`${job?.id || ""}/${job?.status || ""}`}
+              onHooks={(hooks) => update("hooks", hooks)}
+              onExport={() => void startExport("launch-pack")}
             />
           </section>
           <div className="sidebar-end">
@@ -1348,11 +1649,15 @@ export function Editor({
               {job.status === "queued"
                 ? "Waiting for an available worker. You can keep editing."
                 : job.status === "rendering"
-                  ? "Rendering your 15-second MP4 in the background."
+                  ? job.output_kind === "launch-pack"
+                    ? "Rendering 9 launch videos and preparing your ZIP in the background."
+                    : `Rendering your ${job.duration ?? 15}-second MP4 in the background.`
                   : job.output_expired_at
                     ? "Create a new export to render your current project settings."
                     : job.status === "completed"
-                      ? `${job.format === "landscape" ? "1920 × 1080" : "1080 × 1920"} · 30 fps · H.264 MP4`
+                      ? job.output_kind === "launch-pack"
+                        ? "9 MP4s, a thumbnail, and a manifest · ZIP package"
+                        : `${job.format === "landscape" ? "1920 × 1080" : job.format === "square" ? "1080 × 1080" : "1080 × 1920"} · 30 fps · H.264 MP4`
                       : job.error}
             </p>
             {activeJob && (
@@ -1387,7 +1692,11 @@ export function Editor({
                 disabled={downloading}
               >
                 <Download size={17} />
-                {downloading ? "Preparing download…" : "Download MP4"}
+                {downloading
+                  ? "Preparing download…"
+                  : job.output_kind === "launch-pack"
+                    ? "Download ZIP"
+                    : "Download MP4"}
               </button>
             )}
             {job.status === "failed" && job.attempt_count < 3 && (

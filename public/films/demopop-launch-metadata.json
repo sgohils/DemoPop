@@ -10,11 +10,15 @@
   "audioCodec": "aac",
   "audioFileExtension": "aac",
   "pixelFormat": "yuv420p",
-  "bytes": 5364431,
+  "bytes": 5413868,
   "faststart": true,
   "maximumGopFrames": 15,
   "keyframeCount": 32,
   "posterFrame": 217,
+  "brand": {
+    "mark": "Breakout",
+    "logo": "public/brand/breakout-ink.png"
+  },
   "capture": {
     "viewport": {
       "width": 1440,

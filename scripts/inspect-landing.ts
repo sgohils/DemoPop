@@ -3,6 +3,7 @@ import { ensureBrowser } from "@remotion/renderer";
 import { mkdir, writeFile } from "node:fs/promises";
 
 const directory = "out/qa/landing";
+const baseUrl = process.env.DEMOPOP_QA_URL || "http://127.0.0.1:3001";
 await mkdir(directory, { recursive: true });
 const executable = await ensureBrowser();
 if (!("path" in executable)) throw new Error("Chromium is unavailable.");
@@ -58,43 +59,35 @@ async function heroGeometry(page: Page) {
     const watch = hero.querySelector<HTMLButtonElement>(
       "button[aria-label='Watch the film']",
     )!;
-    const describe = (element: Element) => {
-      const bounds = element.getBoundingClientRect();
-      let opacity = 1;
-      for (
-        let node: Element | null = element;
-        node;
-        node = node.parentElement
-      ) {
-        opacity *= Number(getComputedStyle(node).opacity);
-      }
-      const center = {
-        x: bounds.x + bounds.width / 2,
-        y: bounds.y + bounds.height / 2,
-      };
-      const hit = document.elementFromPoint(center.x, center.y);
-      return {
-        x: bounds.x,
-        y: bounds.y,
-        width: bounds.width,
-        height: bounds.height,
-        bottom: bounds.bottom,
-        opacity,
-        insideViewport: bounds.top >= 0 && bounds.bottom <= innerHeight,
-        centerCanReceiveClick:
-          !!hit && (hit === element || element.contains(hit)),
-      };
-    };
-    const heading = describe(title);
-    const create = describe(cta);
-    const movie = describe(film);
-    const intersects = (first: typeof heading, second: typeof heading) =>
-      first.opacity > 0.1 &&
-      second.opacity > 0.1 &&
-      first.x < second.x + second.width &&
-      first.x + first.width > second.x &&
-      first.y < second.y + second.height &&
-      first.y + first.height > second.y;
+    const [heading, create, movie, playback] = [title, cta, film, watch].map(
+      (element) => {
+        const bounds = element.getBoundingClientRect();
+        let opacity = 1;
+        for (
+          let node: Element | null = element;
+          node;
+          node = node.parentElement
+        ) {
+          opacity *= Number(getComputedStyle(node).opacity);
+        }
+        const center = {
+          x: bounds.x + bounds.width / 2,
+          y: bounds.y + bounds.height / 2,
+        };
+        const hit = document.elementFromPoint(center.x, center.y);
+        return {
+          x: bounds.x,
+          y: bounds.y,
+          width: bounds.width,
+          height: bounds.height,
+          bottom: bounds.bottom,
+          opacity,
+          insideViewport: bounds.top >= 0 && bounds.bottom <= innerHeight,
+          centerCanReceiveClick:
+            !!hit && (hit === element || element.contains(hit)),
+        };
+      },
+    );
     return {
       progress: hero.getAttribute("data-scroll-progress"),
       viewport: { width: innerWidth, height: innerHeight },
@@ -102,10 +95,22 @@ async function heroGeometry(page: Page) {
       heading,
       create,
       film: movie,
-      watch: describe(watch),
+      watch: playback,
       overlaps: {
-        headingFilm: intersects(heading, movie),
-        ctaFilm: intersects(create, movie),
+        headingFilm:
+          heading.opacity > 0.1 &&
+          movie.opacity > 0.1 &&
+          heading.x < movie.x + movie.width &&
+          heading.x + heading.width > movie.x &&
+          heading.y < movie.y + movie.height &&
+          heading.y + heading.height > movie.y,
+        ctaFilm:
+          create.opacity > 0.1 &&
+          movie.opacity > 0.1 &&
+          create.x < movie.x + movie.width &&
+          create.x + create.width > movie.x &&
+          create.y < movie.y + movie.height &&
+          create.y + create.height > movie.y,
       },
     };
   });
@@ -116,11 +121,17 @@ try {
     ["desktop", { width: 1440, height: 1000 }],
     ["mobile", { width: 390, height: 844 }],
     ["mobile-short", { width: 390, height: 667 }],
+    ["mobile-short-wide", { width: 390, height: 568 }],
     ["mobile-small", { width: 320, height: 568 }],
   ] as const) {
+    if (
+      process.argv.includes("--phones-only") &&
+      (name === "desktop" || name === "mobile")
+    )
+      continue;
     const page = await browser.newPage({ viewport });
     page.on("pageerror", (error) => errors.push(`${name}: ${error.message}`));
-    await page.goto("http://127.0.0.1:3001/", { waitUntil: "networkidle" });
+    await page.goto(baseUrl, { waitUntil: "networkidle" });
     await page.getByRole("heading", { name: /You built it\./ }).waitFor();
     await page.waitForFunction(() => {
       const film = document.querySelector<HTMLVideoElement>(
@@ -146,7 +157,7 @@ try {
       `${directory}/${name}-hero-geometry.json`,
       JSON.stringify({ top, midpoint }, null, 2),
     );
-    if (name === "mobile-short" || name === "mobile-small") {
+    if (name.startsWith("mobile-short") || name === "mobile-small") {
       const watch = page.getByRole("button", {
         name: "Watch the film",
         exact: true,
@@ -184,6 +195,13 @@ try {
       continue;
     }
     await walkPage(page);
+    await alignSection(page, "#campaign");
+    await screenshot(page, `${name}-campaign`);
+    await page
+      .locator("#campaign")
+      .screenshot({ path: `${directory}/${name}-campaign-full.png` });
+    await alignSection(page, "#studio");
+    await screenshot(page, `${name}-client-workflow`);
     await alignSection(page, "#product");
     await screenshot(page, `${name}-product`);
     for (const [number, title] of [

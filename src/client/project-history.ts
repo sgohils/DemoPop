@@ -11,6 +11,7 @@ export type HistoryAction =
       type: "edit";
       value: ProjectInput | ((current: ProjectInput) => ProjectInput);
       at: number;
+      atomic?: boolean;
     }
   | { type: "undo" | "redo" }
   | { type: "reset"; value: ProjectInput };
@@ -34,11 +35,12 @@ export function projectHistory(
   const current = state.entries[state.index];
   const value =
     typeof action.value === "function" ? action.value(current) : action.value;
-  const changed = (Object.keys(current) as (keyof ProjectInput)[]).filter(
+  const keys = new Set([...Object.keys(current), ...Object.keys(value)]);
+  const changed = ([...keys] as (keyof ProjectInput)[]).filter(
     (key) => JSON.stringify(current[key]) !== JSON.stringify(value[key]),
   );
   if (!changed.length) return state;
-  const group =
+  let group: string | null =
     changed.length === 1 &&
     [
       "name",
@@ -49,9 +51,54 @@ export function projectHistory(
       "cta",
       "beforeCrop",
       "afterCrop",
+      "highlight1Crop",
+      "highlight2Crop",
+      "client",
     ].includes(changed[0])
       ? changed[0]
       : null;
+  if (
+    changed.length === 1 &&
+    changed[0] === "story" &&
+    current.story &&
+    value.story &&
+    current.story.duration === value.story.duration &&
+    current.story.scenes.map((scene) => scene.id).join() ===
+      value.story.scenes.map((scene) => scene.id).join()
+  ) {
+    const edited = current.story.scenes
+      .map((scene, index) =>
+        JSON.stringify(scene) === JSON.stringify(value.story!.scenes[index])
+          ? -1
+          : index,
+      )
+      .filter((index) => index >= 0);
+    if (edited.length === 1) {
+      const index = edited[0],
+        before = current.story.scenes[index],
+        after = value.story.scenes[index];
+      const fields = (Object.keys(before) as (keyof typeof before)[]).filter(
+        (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
+      );
+      if (
+        fields.length === 1 &&
+        ["caption", "crop", "trimStart"].includes(fields[0])
+      )
+        group = `story:${before.id}:${fields[0]}`;
+    }
+  }
+  if (
+    changed.length === 1 &&
+    changed[0] === "hooks" &&
+    current.hooks &&
+    value.hooks
+  ) {
+    const edited = current.hooks
+      .map((hook, index) => (hook === value.hooks![index] ? -1 : index))
+      .filter((index) => index >= 0);
+    if (edited.length === 1) group = `hook:${edited[0]}`;
+  }
+  if (action.atomic) group = null;
   const merge =
     group !== null &&
     group === state.group &&

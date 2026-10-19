@@ -20,6 +20,8 @@ async function setup(
       return void (await respond(route, { signedIn: true, userId: owner }));
     if (path === "/api/brand-kits" && method === "GET")
       return void (await respond(route, { kits: [] }));
+    if (path === "/api/recipes" && method === "GET")
+      return void (await respond(route, { recipes: [] }));
     if (path === `/api/projects/${projectId}` && method === "GET")
       return void (await respond(route, {
         project: sampleProject,

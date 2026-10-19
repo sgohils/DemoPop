@@ -74,6 +74,30 @@ export const LAUNCH_SCENES = [
     detail: "Give a clear next step",
   },
 ] as const;
-export function videoScenes(template: string) {
-  return template === "launch" ? LAUNCH_SCENES : SCENES;
+export function videoScenes(input: string | ProjectInput) {
+  if (typeof input !== "string" && (input.story || input.format === "square")) {
+    const story = storyTimeline(input);
+    return [
+      {
+        name: "Opening",
+        start: 0,
+        end: story.openingEnd,
+        preview: Math.round(story.openingEnd / 2),
+        detail: "The hook",
+      },
+      ...story.beats,
+      {
+        name: "Closing",
+        start: story.closingStart,
+        end: story.total,
+        preview: Math.round((story.closingStart + story.total) / 2),
+        detail: "A clear next step",
+      },
+    ];
+  }
+  return (typeof input === "string" ? input : input.template) === "launch"
+    ? LAUNCH_SCENES
+    : SCENES;
 }
+import type { ProjectInput } from "./project";
+import { storyTimeline } from "./launch-kit";

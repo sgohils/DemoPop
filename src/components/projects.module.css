@@ -889,3 +889,29 @@
     padding: 22px 0 25px;
   }
 }
+.folders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0 0 20px;
+}
+.folders button {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 11px;
+  border: 1px solid #dfe4ed;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: #738099;
+}
+.folders button[aria-pressed="true"] {
+  background: #edf2ff;
+  color: #365ddb;
+  border-color: #b6c5f4;
+}
+.folders small {
+  font-size: 9px;
+  opacity: 0.7;
+}

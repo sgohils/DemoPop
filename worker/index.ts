@@ -8,9 +8,11 @@ import {
   SUPPORTED_TEMPLATE_VERSIONS,
   type Media,
   SAMPLE_ASSETS,
+  projectAssetIds,
 } from "../src/shared/project";
 import { safeStoragePath } from "../src/server/access";
 import { renderVideo, cleanupBundle } from "./render";
+import { renderLaunchPackage } from "./launch-package";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL,
   key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) {
@@ -84,7 +86,9 @@ while (!stopping) {
     if (!SUPPORTED_TEMPLATE_VERSIONS.has(job.template_version))
       throw new Error("Unsupported template version");
     const project = projectSchema.parse(job.snapshot);
+    const mediaCache = new Map<string, Media>();
     async function media(id: string): Promise<Media> {
+      if (mediaCache.has(id)) return mediaCache.get(id)!;
       if (Object.prototype.hasOwnProperty.call(SAMPLE_ASSETS, id)) {
         const asset = SAMPLE_ASSETS[id as keyof typeof SAMPLE_ASSETS];
         return {
@@ -110,44 +114,86 @@ while (!stopping) {
       // Controlled database paths only. Embed private inputs so Chromium cannot fetch arbitrary URLs.
       const bytes = Buffer.from(await file.data.arrayBuffer());
       if (bytes.length > 16 * 1024 * 1024) throw new Error("Input too large");
-      return {
-        src: `data:image/webp;base64,${bytes.toString("base64")}`,
+      const result: Media = {
+        src: `data:${asset.data.kind === "video" ? "video/mp4" : "image/webp"};base64,${bytes.toString("base64")}`,
         width: asset.data.width,
         height: asset.data.height,
+        ...(asset.data.kind === "video"
+          ? { kind: "video", duration: asset.data.duration }
+          : {}),
       };
+      mediaCache.set(id, result);
+      return result;
     }
     const props = {
       project,
       before: await media(project.before),
       after: await media(project.after),
       logo: project.logo ? await media(project.logo) : null,
+      sceneMedia: Object.fromEntries(
+        await Promise.all(
+          projectAssetIds(project).map(
+            async (id) => [id, await media(id)] as const,
+          ),
+        ),
+      ),
     };
-    const output = path.join(temp, "video.mp4");
-    await renderVideo(
-      props,
-      output,
-      (p) => {
-        progress = p;
-      },
-      cancelSignal,
-    );
+    let output = path.join(temp, "video.mp4");
+    let previewFile: string | null = null;
+    if (job.output_kind === "launch-pack") {
+      const result = await renderLaunchPackage(
+        props,
+        temp,
+        (p) => {
+          progress = p;
+        },
+        cancelSignal,
+      );
+      output = result.output;
+      previewFile = result.preview;
+    } else
+      await renderVideo(
+        props,
+        output,
+        (p) => {
+          progress = p;
+        },
+        cancelSignal,
+      );
     if (lost || stopping) throw new Error("Lease lost or worker stopping");
     await heartbeat();
     if (lost) throw new Error("Lease lost");
-    const outputPath = `${job.owner_id}/${job.id}/${job.lease_token}.mp4`;
+    const outputPath = `${job.owner_id}/${job.id}/${job.lease_token}.${job.output_kind === "launch-pack" ? "zip" : "mp4"}`;
+    const previewPath = previewFile
+      ? `${job.owner_id}/${job.id}/${job.lease_token}-preview.mp4`
+      : null;
+    if (previewFile && previewPath) {
+      const uploadedPreview = await db.storage
+        .from("exports")
+        .upload(previewPath, await readFile(previewFile), {
+          contentType: "video/mp4",
+          upsert: false,
+        });
+      if (uploadedPreview.error) throw uploadedPreview.error;
+    }
     const upload = await db.storage
       .from("exports")
       .upload(outputPath, await readFile(output), {
-        contentType: "video/mp4",
+        contentType:
+          job.output_kind === "launch-pack" ? "application/zip" : "video/mp4",
         upsert: false,
       });
-    if (upload.error) throw upload.error;
+    if (upload.error) {
+      if (previewPath) await db.storage.from("exports").remove([previewPath]);
+      throw upload.error;
+    }
     const complete = await db
       .from("render_jobs")
       .update({
         status: "completed",
         progress: 1,
         output_path: outputPath,
+        preview_path: previewPath,
         error: null,
         lease_token: null,
         lease_until: null,
@@ -157,7 +203,9 @@ while (!stopping) {
       .eq("status", "rendering")
       .select("id");
     if (complete.error || !complete.data?.length) {
-      await db.storage.from("exports").remove([outputPath]);
+      await db.storage
+        .from("exports")
+        .remove([outputPath, ...(previewPath ? [previewPath] : [])]);
       throw new Error("Completion lost lease");
     }
     console.log(`Completed ${job.id}`);
@@ -170,7 +218,12 @@ while (!stopping) {
           status: "failed",
           error: stopping
             ? "The worker stopped. Retry this export."
-            : "Rendering could not finish. Retry this export; if it keeps failing, check the images.",
+            : e instanceof Error &&
+                /^The launch package (is too large|exceeds 100 MB)\./.test(
+                  e.message,
+                )
+              ? "This launch package is too large. Choose a shorter story or simpler media, then create a new export."
+              : "Rendering could not finish. Retry this export; if it keeps failing, check the media.",
           lease_token: null,
           lease_until: null,
         })

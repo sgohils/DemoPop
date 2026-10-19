@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { projectSchema, type ProjectInput } from "../shared/project";
+import {
+  projectAssetIds,
+  projectSchema,
+  storySceneSchema,
+  storySchema,
+  type ProjectInput,
+} from "../shared/project";
 
 export const draftProjectSchema = projectSchema.extend({
   name: z.string().max(60),
@@ -8,6 +14,20 @@ export const draftProjectSchema = projectSchema.extend({
   highlight2: z.string().max(48),
   url: z.string().max(80),
   cta: z.string().max(36).default("See it in action."),
+  story: storySchema
+    .extend({
+      scenes: z
+        .array(storySceneSchema.extend({ caption: z.string().max(70) }))
+        .min(3)
+        .max(6)
+        .refine(
+          (scenes) =>
+            new Set(scenes.map((scene) => scene.id)).size === scenes.length,
+        ),
+    })
+    .nullable()
+    .optional(),
+  hooks: z.array(z.string().max(70)).length(3).optional(),
 });
 export type DraftAssets = Record<
   string,
@@ -62,11 +82,7 @@ export async function readDraft(key: string): Promise<Draft | null> {
 }
 export function writeDraft(draft: Draft) {
   // Persist IDs and local image blobs only: never signed URLs or credentials.
-  const ids = new Set([
-    draft.project.before,
-    draft.project.after,
-    draft.project.logo,
-  ]);
+  const ids = new Set(projectAssetIds(draft.project));
   const assets = Object.fromEntries(
     Object.entries(draft.assets).filter(([id]) => ids.has(id)),
   );

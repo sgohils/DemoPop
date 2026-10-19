@@ -1,0 +1,78 @@
+{
+  "description": "Web previews of a real DemoPop launch package. Orbit is a fictional sample product. Full exports retain their original 1080p dimensions.",
+  "source": "out/qa/launch-workspace",
+  "files": [
+    {
+      "name": "landscape-original",
+      "bytes": 463638,
+      "width": 960,
+      "height": 540,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "landscape-product",
+      "bytes": 458952,
+      "width": 960,
+      "height": 540,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "landscape-benefit",
+      "bytes": 464276,
+      "width": 960,
+      "height": 540,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "vertical-original",
+      "bytes": 361856,
+      "width": 406,
+      "height": 720,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "vertical-product",
+      "bytes": 357810,
+      "width": 406,
+      "height": 720,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "vertical-benefit",
+      "bytes": 360979,
+      "width": 406,
+      "height": 720,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "square-original",
+      "bytes": 457686,
+      "width": 640,
+      "height": 640,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "square-product",
+      "bytes": 451871,
+      "width": 640,
+      "height": 640,
+      "duration": 15.018,
+      "codec": "h264"
+    },
+    {
+      "name": "square-benefit",
+      "bytes": 455792,
+      "width": 640,
+      "height": 640,
+      "duration": 15.018,
+      "codec": "h264"
+    }
+  ]
+}

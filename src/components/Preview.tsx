@@ -1,6 +1,6 @@
 "use client";
 import { Player, type PlayerRef } from "@remotion/player";
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useEffect, type CSSProperties } from "react";
 import {
   Play,
   Pause,
@@ -43,8 +43,9 @@ export function Preview({
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const dimensions = videoSettings(input.project);
+  const duration = dimensions.durationInFrames / VIDEO.fps;
   const handledSceneRequest = useRef<number | undefined>(undefined);
-  const timeline = videoScenes(input.project.template);
+  const timeline = videoScenes(input.project);
   const activeScene = timeline.findIndex(
     (scene) => frame >= scene.start && frame < scene.end,
   );
@@ -81,9 +82,14 @@ export function Preview({
     setReady(false);
     setError("");
     ref.current?.pause();
-    const images = [input.before.src, input.after.src, input.logo?.src].filter(
-      Boolean,
-    ) as string[];
+    const images = [
+      input.before.src,
+      input.after.src,
+      input.logo?.src,
+      ...Object.values(input.sceneMedia ?? {})
+        .filter((media) => media.kind !== "video")
+        .map((media) => media.src),
+    ].filter(Boolean) as string[];
     Promise.all([
       ...images.map(
         (src) =>
@@ -115,6 +121,7 @@ export function Preview({
     input.after.src,
     input.logo?.src,
     input.project.font,
+    input.sceneMedia,
     retryCount,
   ]);
   useEffect(() => {
@@ -136,7 +143,10 @@ export function Preview({
     };
   }, []);
   function togglePlayback() {
-    if (!playing && (poster.current || frame >= VIDEO.durationInFrames - 1)) {
+    if (
+      !playing &&
+      (poster.current || frame >= dimensions.durationInFrames - 1)
+    ) {
       ref.current?.seekTo(0);
     }
     poster.current = false;
@@ -166,7 +176,7 @@ export function Preview({
           ref={ref}
           component={Showcase}
           inputProps={input}
-          durationInFrames={VIDEO.durationInFrames}
+          durationInFrames={dimensions.durationInFrames}
           fps={VIDEO.fps}
           compositionWidth={dimensions.width}
           compositionHeight={dimensions.height}
@@ -233,8 +243,8 @@ export function Preview({
           aria-label="Video position"
           type="range"
           min={0}
-          max={449}
-          value={frame}
+          max={dimensions.durationInFrames - 1}
+          value={Math.min(frame, dimensions.durationInFrames - 1)}
           onChange={(e) => {
             poster.current = false;
             ref.current?.pause();
@@ -242,7 +252,8 @@ export function Preview({
           }}
         />
         <span>
-          {(frame / 30).toFixed(1)} <b>/ 15s</b>
+          {(Math.min(frame, dimensions.durationInFrames - 1) / 30).toFixed(1)}{" "}
+          <b>/ {duration}s</b>
         </span>
         {input.project.template === "launch" &&
           input.project.sound === "pulse" && (
@@ -265,10 +276,14 @@ export function Preview({
           <div className="timeline-heading">
             <span>Your story</span>
             <span>
-              {timeline[activeScene]?.name || "Closing"} <b>· 15 seconds</b>
+              {timeline[activeScene]?.name || "Closing"}{" "}
+              <b>· {duration} seconds</b>
             </span>
           </div>
-          <div className="scene-track">
+          <div
+            className="scene-track"
+            style={{ "--scene-count": timeline.length } as CSSProperties}
+          >
             {timeline.map((scene, index) => (
               <button
                 key={scene.name}
@@ -290,7 +305,9 @@ export function Preview({
                   <i />
                 </span>
                 <span className="scene-name">{scene.name}</span>
-                <span className="scene-time">{scene.start / 30}s</span>
+                <span className="scene-time">
+                  {(scene.start / 30).toFixed(1).replace(/\.0$/, "")}s
+                </span>
               </button>
             ))}
           </div>

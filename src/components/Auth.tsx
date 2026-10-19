@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, ArrowLeft } from "lucide-react";
 import { Brand } from "./Brand";
+import { safeAuthNext } from "../shared/auth-next";
 export function Auth({
   configured,
   confirmationFailed = false,
+  next,
 }: {
   configured: boolean;
   confirmationFailed?: boolean;
+  next?: string;
 }) {
   const router = useRouter();
   const [mode, setMode] = useState<"login" | "signup" | "recover">("login");
@@ -30,11 +33,16 @@ export function Auth({
       const res = await fetch(`/api/auth/${mode}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(Object.fromEntries(form)),
+        body: JSON.stringify({
+          ...Object.fromEntries(form),
+          ...(mode !== "recover" && safeAuthNext(next) === "/create"
+            ? { next: "/create" }
+            : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      if (data.signedIn) router.push("/projects");
+      if (data.signedIn) router.push(safeAuthNext(next));
       else setMessage(data.message);
     } catch (e) {
       setError((e as Error).message);
@@ -46,8 +54,14 @@ export function Auth({
     <>
       <header className="site-header">
         <Brand />
-        <Link href="/" className="text-link">
-          <ArrowLeft size={15} /> Back home
+        <Link
+          href={safeAuthNext(next) === "/create" ? "/create" : "/"}
+          className="text-link"
+        >
+          <ArrowLeft size={15} />{" "}
+          {safeAuthNext(next) === "/create"
+            ? "Back to your video"
+            : "Back home"}
         </Link>
       </header>
       <main className="auth-layout">

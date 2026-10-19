@@ -34,6 +34,8 @@ async function mockApi(
       await json(route, { kits: [] });
       return;
     }
+    if (path === "/api/recipes" && method === "GET")
+      return void (await json(route, { recipes: [] }));
     if (/^\/api\/projects\/[^/]+\/exports$/.test(path) && method === "GET") {
       await json(route, { jobs: [], hasMore: false });
       return;

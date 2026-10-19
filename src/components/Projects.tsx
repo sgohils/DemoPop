@@ -28,6 +28,8 @@ type ProjectSummary = {
   updated_at: string;
   format?: string;
   template?: string;
+  client?: string;
+  duration?: number;
 };
 type ProjectError = {
   message: string;
@@ -63,6 +65,7 @@ export function Projects({ configured }: { configured: boolean }) {
   const [busy, setBusy] = useState<string | null>(null),
     [message, setMessage] = useState("");
   const [signingOut, setSigningOut] = useState(false);
+  const [folder, setFolder] = useState("");
   useEffect(() => {
     if (!configured) return;
     let live = true;
@@ -164,9 +167,21 @@ export function Projects({ configured }: { configured: boolean }) {
       setSigningOut(false);
     }
   }
-  const matchingProjects = projects.filter((project) =>
-    project.name.toLowerCase().includes(query.trim().toLowerCase()),
+  const matchingProjects = projects.filter(
+    (project) =>
+      `${project.name} ${project.client || ""}`
+        .toLowerCase()
+        .includes(query.trim().toLowerCase()) &&
+      (!folder ||
+        (folder === "__unfiled" ? !project.client : project.client === folder)),
   );
+  const folders = [
+    ...new Set(
+      projects
+        .map((project) => project.client)
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
   return (
     <div className={styles.page}>
       <header className={`site-header ${styles.header}`}>
@@ -199,7 +214,13 @@ export function Projects({ configured }: { configured: boolean }) {
             <h1>
               Your projects<span className="heading-dot">.</span>
             </h1>
-            <p>Pick up where you left off. Make the next reveal yours.</p>
+            <p>
+              Pick up where you left off. Or{" "}
+              <Link href="/create" className="text-link">
+                create a video from a link <ArrowUpRight size={12} />
+              </Link>
+              .
+            </p>
           </div>
           <Link href="/editor/new" className="button primary">
             <Plus size={17} /> Create a video
@@ -257,6 +278,37 @@ export function Projects({ configured }: { configured: boolean }) {
             )}
           </div>
         </div>
+        {!!folders.length && (
+          <nav className={styles.folders} aria-label="Client folders">
+            <button aria-pressed={!folder} onClick={() => setFolder("")}>
+              All clients <small>{projects.length}</small>
+            </button>
+            {folders.map((client) => (
+              <button
+                key={client}
+                aria-pressed={folder === client}
+                onClick={() => setFolder(client)}
+              >
+                {client}
+                <small>
+                  {
+                    projects.filter((project) => project.client === client)
+                      .length
+                  }
+                </small>
+              </button>
+            ))}
+            <button
+              aria-pressed={folder === "__unfiled"}
+              onClick={() => setFolder("__unfiled")}
+            >
+              Unfiled
+              <small>
+                {projects.filter((project) => !project.client).length}
+              </small>
+            </button>
+          </nav>
+        )}
         {trash && (
           <p className={styles.trashNotice}>
             Trashed projects can be restored until your workspace retention
@@ -369,9 +421,17 @@ export function Projects({ configured }: { configured: boolean }) {
                       ) : (
                         <span>
                           <Film size={12} />
-                          15-second video
+                          {p.format === "square" ? "Square" : "Video"}
                         </span>
                       )}
+                      {p.client && (
+                        <>
+                          <i />
+                          <span>{p.client}</span>
+                        </>
+                      )}
+                      <i />
+                      <span>{p.duration ?? 15}s</span>
                       {motion && (
                         <>
                           <i />
@@ -484,7 +544,7 @@ export function Projects({ configured }: { configured: boolean }) {
       <div className={styles.workspaceFooter}>
         <span>YOUR IDEAS. YOUR WORK. YOUR NEXT REVEAL.</span>
         <span>
-          15 seconds <i /> 1080p <i /> Made yours
+          Launch films & product stories <i /> Made yours
         </span>
       </div>
     </div>

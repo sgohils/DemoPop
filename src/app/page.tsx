@@ -1,8 +1,10 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
 import { ArrowDownRight, ArrowUpRight, Check, Plus } from "lucide-react";
 import { Brand } from "../components/Brand";
+import { BrandMark } from "../components/BrandMark";
 import { LaunchScroll } from "../components/LaunchScroll";
+import { LaunchCampaign } from "../components/LaunchCampaign";
+import { LaunchWorkflow } from "../components/LaunchWorkflow";
 import {
   LandingMotion,
   ProductStory,
@@ -13,19 +15,27 @@ import styles from "./home.module.css";
 const questions = [
   [
     "What can I make with DemoPop?",
-    "A 15-second announcement film for a product launch, website redesign, portfolio update, or new feature. Bring two screenshots, write your hook and highlights, and choose the motion that fits your story.",
+    "A short reveal or a 15-, 30-, or 60-second product story. Start with your website, screenshots, or MP4 clips, build up to six scenes, and add your own captions, branding, and soundtrack.",
   ],
   [
-    "Is the film at the top actually made with DemoPop?",
-    "Yes. It uses the same Launch Film renderer, captions, product framing, and original soundtrack available in the editor. The product shots are captures of DemoPop itself.",
+    "What’s in a launch package?",
+    "Nine MP4 videos: three opening hooks, each in landscape (16:9), vertical (9:16), and square (1:1). Your ZIP also includes a thumbnail. You can edit each hook before exporting or export a single video instead.",
   ],
   [
     "Do I need an account to try it?",
-    "You can open the editor, use your own screenshots, change the copy and styling, and preview your film without an account. Sign in to save projects, use saved brand kits, and export.",
+    "You can use your own media, change the copy and styling, and preview without an account. Browser drafts and local recipes stay on your device. Sign in to save account projects, export, and share client review links.",
   ],
   [
-    "What do I get when I export?",
-    "A 1080p H.264 MP4 at 30 frames per second. Choose portrait (9:16) or landscape (16:9). Launch Film includes an optional original soundtrack; you can also export it silently.",
+    "Can I update a video without rebuilding it?",
+    "Yes. Replace a screenshot or clip while keeping its caption, framing, and timing. Save a launch recipe to reuse your story and brand for the next update. Recipe application is undoable.",
+  ],
+  [
+    "How do client reviews work?",
+    "Create a branded link for a completed export. Your client can leave timestamped comments and approve that exact version without signing up. You control downloads and can revoke the link. Links expire after 14 days.",
+  ],
+  [
+    "Are the videos on this page real exports?",
+    "Yes. The opening film uses captures of DemoPop itself. The Orbit campaign is a fictional sample product rendered as a real nine-video package. These web previews are compressed; exported videos retain full 1080p dimensions at 30 fps.",
   ],
 ];
 
@@ -38,17 +48,20 @@ export default function Home() {
       <header className={styles.header}>
         <Brand />
         <nav aria-label="Main navigation">
-          <a href="#product" className={styles.navSection}>
-            The product
+          <a href="#campaign" className={styles.navSection}>
+            Launch package
           </a>
-          <a href="#styles" className={styles.navSection}>
-            The possibilities
+          <a href="#product" className={styles.navSection}>
+            How it works
+          </a>
+          <a href="#studio" className={styles.navSection}>
+            For client work
           </a>
           <Link href="/projects" className={styles.projectLink}>
             Your projects
           </Link>
           <Link href="/editor/new" className={styles.navCta}>
-            Open studio <ArrowUpRight size={15} />
+            Try the studio <ArrowUpRight size={15} />
           </Link>
         </nav>
       </header>
@@ -70,41 +83,73 @@ export default function Home() {
           </div>
 
           <section
+            id="campaign"
+            className={styles.campaignSection}
+            aria-labelledby="campaign-heading"
+          >
+            <div className={styles.sectionTopline} data-reveal>
+              <p className={styles.eyebrow}>
+                <span /> BUILT FOR THE WHOLE LAUNCH
+              </p>
+              <span className={styles.indexLabel}>01 / THE LAUNCH PACKAGE</span>
+            </div>
+            <div className={styles.campaignHeading} data-reveal>
+              <h2 id="campaign-heading">
+                Make it once.
+                <br />
+                <em>Launch it nine ways.</em>
+              </h2>
+              <p>
+                Three opening hooks. Three formats. One download.
+                <br />
+                Give every channel a considered first impression.
+              </p>
+            </div>
+            <div data-reveal>
+              <LaunchCampaign />
+            </div>
+          </section>
+
+          <section
             id="product"
             className={styles.productSection}
             aria-labelledby="product-heading"
           >
             <div className={styles.sectionTopline} data-reveal>
               <p className={styles.eyebrow}>
-                <span /> FROM BUILT TO SEEN
+                <span /> YOUR PRODUCT IS THE STARTING POINT
               </p>
-              <span className={styles.indexLabel}>01 / THE PRODUCT</span>
+              <span className={styles.indexLabel}>02 / HOW IT WORKS</span>
             </div>
             <div className={styles.productLead} data-reveal>
               <h2 id="product-heading">
-                The work is done.
+                A story with substance.
                 <br />
-                <span>The entrance is everything.</span>
+                <span>Made from your product.</span>
               </h2>
               <div>
                 <ArrowDownRight size={44} strokeWidth={1} />
-                <p>
-                  That product you obsessed over deserves more than a screenshot
-                  in a post. Give it a hook. A reveal. A reason to stop
-                  scrolling.
-                </p>
+                <div className={styles.productCopy}>
+                  <p>
+                    Start with a website link, or bring your screenshots and
+                    clips. Shape your product story at 15, 30, or 60 seconds.
+                  </p>
+                  <Link href="/create" className={styles.productImport}>
+                    Create from link <ArrowUpRight size={15} />
+                  </Link>
+                </div>
               </div>
             </div>
             <ProductStory />
             <div className={styles.proofLine} data-reveal>
               <span>
-                <Check size={14} /> Real product screenshots
+                <Check size={14} /> Your actual product
               </span>
               <span>
-                <Check size={14} /> Motion you can preview
+                <Check size={14} /> 3–6 editable scenes
               </span>
               <span>
-                <Check size={14} /> A film you can export
+                <Check size={14} /> Live motion preview
               </span>
             </div>
           </section>
@@ -118,7 +163,7 @@ export default function Home() {
               <p className={styles.eyebrow}>
                 <span /> GOOD TASTE. BUILT IN.
               </p>
-              <span className={styles.indexLabel}>02 / FIND YOUR MOTION</span>
+              <span className={styles.indexLabel}>03 / FIND YOUR MOTION</span>
             </div>
             <div className={styles.galleryHeading} data-reveal>
               <h2 id="styles-heading">
@@ -142,130 +187,24 @@ export default function Home() {
           >
             <div className={styles.sectionTopline} data-reveal>
               <p className={styles.eyebrow}>
-                <span /> SMALL DETAILS. BIG DIFFERENCE.
+                <span /> FOR FOUNDERS, MAKERS & CLIENT WORK
               </p>
-              <span className={styles.indexLabel}>03 / INSIDE THE STUDIO</span>
+              <span className={styles.indexLabel}>04 / KEEP YOUR MOMENTUM</span>
             </div>
             <div className={styles.studioHeading} data-reveal>
               <h2 id="studio-heading">
-                Looks like a launch team.
+                The next launch
                 <br />
-                <span>Works like a small tool.</span>
+                <span>starts a little further ahead.</span>
               </h2>
               <p>
-                The creative decisions are considered.
+                Bring the product. Keep your direction.
                 <br />
-                The controls stay in your hands.
+                Close the loop with your client.
               </p>
             </div>
-            <div className={styles.capabilityGrid}>
-              <article className={styles.capability} data-reveal data-animate>
-                <div className={styles.typeVisual} aria-hidden="true">
-                  <span className={styles.visualMicro}>
-                    YOUR BRAND, IN MOTION
-                  </span>
-                  <div className={styles.typeWord}>
-                    Aa<span>.</span>
-                  </div>
-                  <div className={styles.swatches}>
-                    <i />
-                    <i />
-                    <i />
-                    <span>DM Sans / Manrope</span>
-                  </div>
-                  <div className={styles.brandCursor}>
-                    Your signature <ArrowUpRight size={13} />
-                  </div>
-                </div>
-                <div className={styles.capabilityCopy}>
-                  <span>01</span>
-                  <h3>Recognizably yours.</h3>
-                  <p>
-                    Your color, font, logo, and closing action. Save a brand kit
-                    and bring the same signature to your next launch.
-                  </p>
-                </div>
-              </article>
-              <article className={styles.capability} data-reveal data-animate>
-                <div className={styles.timelineVisual} aria-hidden="true">
-                  <span className={styles.visualMicro}>
-                    EVERY BEAT HAS A PURPOSE
-                  </span>
-                  <div className={styles.soundBars}>
-                    {Array.from({ length: 29 }, (_, index) => (
-                      <i
-                        key={index}
-                        style={
-                          {
-                            "--bar": `${16 + ((index * 17) % 55)}px`,
-                            "--delay": `${index * -0.08}s`,
-                          } as CSSProperties
-                        }
-                      />
-                    ))}
-                  </div>
-                  <div className={styles.miniTimeline}>
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                    <b />
-                  </div>
-                  <div className={styles.timelineLabels}>
-                    <span>THE HOOK</span>
-                    <span>THE REVEAL</span>
-                    <span>THE CLOSE</span>
-                  </div>
-                </div>
-                <div className={styles.capabilityCopy}>
-                  <span>02</span>
-                  <h3>Directed, down to the beat.</h3>
-                  <p>
-                    Purposeful camera moves, readable type, and an original
-                    score. Preview the whole film or jump straight to any scene.
-                  </p>
-                </div>
-              </article>
-              <article className={styles.capability} data-reveal data-animate>
-                <div className={styles.projectVisual} aria-hidden="true">
-                  <span className={styles.visualMicro}>
-                    READY FOR THE NEXT ONE
-                  </span>
-                  <div className={styles.miniProject}>
-                    <span className={styles.miniProjectArt}>
-                      d<span>.</span>
-                    </span>
-                    <div>
-                      <b>The next big thing</b>
-                      <span>Launch Film · 15 sec</span>
-                    </div>
-                    <Check size={15} />
-                  </div>
-                  <div className={styles.miniProject}>
-                    <span className={styles.miniProjectArt}>
-                      d<span>.</span>
-                    </span>
-                    <div>
-                      <b>A different direction</b>
-                      <span>Project duplicate</span>
-                    </div>
-                    <ArrowUpRight size={15} />
-                  </div>
-                  <span className={styles.draftPill}>
-                    <i /> Browser draft saved
-                  </span>
-                </div>
-                <div className={styles.capabilityCopy}>
-                  <span>03</span>
-                  <h3>Keep your momentum.</h3>
-                  <p>
-                    Recover a draft, duplicate a direction, revisit an export.
-                    The next video starts with the work you already did.
-                  </p>
-                </div>
-              </article>
+            <div data-reveal>
+              <LaunchWorkflow />
             </div>
           </section>
 
@@ -319,10 +258,10 @@ export default function Home() {
               </h2>
               <div className={styles.finalActions}>
                 <Link href="/editor/new" className={styles.primaryCta}>
-                  Make your first film <ArrowUpRight size={19} />
+                  Create your first launch <ArrowUpRight size={19} />
                 </Link>
                 <p>
-                  Try it with your own screenshots.
+                  Your screenshots. Your clips. Your brand.
                   <br />
                   No account needed to preview.
                 </p>
@@ -330,7 +269,7 @@ export default function Home() {
             </div>
             <div className={styles.finalMeta}>
               <span>YOUR PRODUCT. YOUR STORY.</span>
-              <span>15 SECONDS TO MAKE IT MATTER.</span>
+              <span>ONE PRODUCT. A WHOLE LAUNCH.</span>
             </div>
           </section>
         </LandingMotion>
@@ -344,11 +283,12 @@ export default function Home() {
             <Link href="/auth">
               Sign in <ArrowUpRight size={13} />
             </Link>
-            <a href="#product">Back to the product ↑</a>
+            <a href="#campaign">See the launch package ↑</a>
           </div>
         </div>
         <div className={styles.footerWord} aria-hidden="true">
-          DemoPop<span>✳</span>
+          DemoPop
+          <BrandMark />
         </div>
         <div className={styles.footerBottom}>
           <span>INDEPENDENT PRODUCT. CONSIDERED MOTION.</span>

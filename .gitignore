@@ -9,6 +9,7 @@ node_modules/
 .render-*/
 *.tsbuildinfo
 out/qa/
+out/demopop-launch-kit/
 out/demopop-launch.mp4
 out/browser-results/
 out/cloud-ui-results/

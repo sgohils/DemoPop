@@ -31,7 +31,7 @@ test("sample preview and desktop editor really play, scrub and update", async ({
     ),
   ).toBeLessThan(200);
   await page.getByRole("button", { name: "Pause", exact: true }).click();
-  await page.getByRole("link", { name: "Open studio", exact: true }).click();
+  await page.getByRole("link", { name: "Use this style", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "The details" }),
   ).toBeVisible();

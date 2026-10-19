@@ -10,6 +10,7 @@ import {
   launchProject,
   sampleAsset,
   SUPPORTED_TEMPLATE_VERSIONS,
+  TEMPLATE_VERSION,
 } from "../src/shared/project";
 
 test("legacy projects retain their original format while creative settings are validated", () => {
@@ -28,7 +29,14 @@ test("legacy projects retain their original format while creative settings are v
   assert.equal(sampleAsset("sample-launch-after")?.width, 2560);
   assert.equal(sampleAsset("sample-unknown"), null);
   assert.equal(sampleAsset("__proto__"), null);
-  for (const version of ["reveal-1", "studio-2", "launch-3", "launch-4"])
+  for (const version of [
+    "reveal-1",
+    "studio-2",
+    "launch-3",
+    "launch-4",
+    "launch-5",
+    "studio-6",
+  ])
     assert.ok(SUPPORTED_TEMPLATE_VERSIONS.has(version));
   assert.deepEqual(videoSettings({ ...parsed, format: "landscape" }), {
     width: 1920,
@@ -78,6 +86,8 @@ test("studio migration isolates brands and manages projects and retained storage
       "003_studio_workflows.sql",
       "004_launch_films.sql",
       "005_launch_quality.sql",
+      "006_highlight_framing.sql",
+      "007_launch_workspace.sql",
     ])
       await db.exec(
         (await readFile(`supabase/migrations/${file}`, "utf8")).replace(
@@ -152,13 +162,18 @@ test("studio migration isolates brands and manages projects and retained storage
         [alice, sampleProject.name, { ...sampleProject, before: asset }, asset],
       )
     ).rows[0].id;
+    const focusedLaunch = {
+      ...launchProject,
+      highlight1Crop: { x: 0.1, y: 0.8, zoom: 1.7 },
+      highlight2Crop: { x: 1, y: 0.1, zoom: 2 },
+    };
     const launch = (
       await db.query<{ id: string }>(
         "insert into public.projects(owner_id,name,settings,before_asset,after_asset) values($1,$2,$3,$4,$5) returning id",
         [
           alice,
           launchProject.name,
-          launchProject,
+          focusedLaunch,
           launchProject.before,
           launchProject.after,
         ],
@@ -176,7 +191,7 @@ test("studio migration isolates brands and manages projects and retained storage
     const launchJob = (
       await db.query<{ result: { id: string } }>(
         "select public.enqueue_render_with_result($1,$2,$3,10) as result",
-        [alice, launch, launchProject],
+        [alice, launch, focusedLaunch],
       )
     ).rows[0].result.id;
     const launchRow = (
@@ -188,9 +203,58 @@ test("studio migration isolates brands and manages projects and retained storage
         [launchJob],
       )
     ).rows[0];
-    assert.equal(launchRow.template_version, "launch-4");
+    assert.equal(launchRow.template_version, "studio-6");
+    assert.equal(launchRow.template_version, TEMPLATE_VERSION);
     assert.equal(launchRow.snapshot.sound, "pulse");
     assert.equal(launchRow.snapshot.cta, launchProject.cta);
+    assert.deepEqual(
+      launchRow.snapshot.highlight1Crop,
+      focusedLaunch.highlight1Crop,
+    );
+    assert.deepEqual(
+      launchRow.snapshot.highlight2Crop,
+      focusedLaunch.highlight2Crop,
+    );
+    const revisedLaunch = {
+      ...focusedLaunch,
+      highlight1Crop: null,
+      highlight2Crop: { x: 0.2, y: 0.9, zoom: 1.1 },
+    };
+    const reusedLaunch = (
+      await db.query<{ result: { id: string; reused: boolean } }>(
+        "select public.enqueue_render_with_result($1,$2,$3,10) as result",
+        [alice, launch, revisedLaunch],
+      )
+    ).rows[0].result;
+    assert.deepEqual(reusedLaunch, { id: launchJob, reused: true });
+    assert.deepEqual(
+      (
+        await db.query<{ settings: typeof revisedLaunch }>(
+          "select settings from public.projects where id=$1",
+          [launch],
+        )
+      ).rows[0].settings,
+      revisedLaunch,
+      "later framing edits save to the project",
+    );
+    assert.deepEqual(
+      (
+        await db.query<{ snapshot: typeof focusedLaunch }>(
+          "select snapshot from public.render_jobs where id=$1",
+          [launchJob],
+        )
+      ).rows[0].snapshot,
+      focusedLaunch,
+      "an active export keeps the feature shots captured when it was queued",
+    );
+    await assert.rejects(
+      () =>
+        db.query("update public.render_jobs set snapshot=$1 where id=$2", [
+          revisedLaunch,
+          launchJob,
+        ]),
+      /Immutable export snapshot/,
+    );
     await assert.rejects(
       () =>
         db.query("select public.manage_project($1,$2,'duplicate')", [

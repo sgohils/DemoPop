@@ -32,6 +32,40 @@ test("project schema rejects remote paths, extra owner fields, overlong captions
     true,
   );
 });
+test("highlight framing accepts legacy automatic shots and validates custom source crops", () => {
+  const legacy = projectSchema.parse(sampleProject);
+  assert.equal(legacy.highlight1Crop, undefined);
+  assert.equal(legacy.highlight2Crop, undefined);
+  const automatic = projectSchema.parse({
+    ...legacy,
+    highlight1Crop: null,
+    highlight2Crop: null,
+  });
+  assert.equal(automatic.highlight1Crop, null);
+  assert.equal(automatic.highlight2Crop, null);
+  const custom = {
+    ...legacy,
+    highlight1Crop: { x: 0, y: 1, zoom: 1 },
+    highlight2Crop: { x: 1, y: 0, zoom: 2 },
+  };
+  assert.deepEqual(projectSchema.parse(custom), custom);
+  for (const key of ["highlight1Crop", "highlight2Crop"] as const)
+    for (const invalid of [
+      { x: -0.01, y: 0, zoom: 1 },
+      { x: 0, y: 1.01, zoom: 1 },
+      { x: 0, y: 0, zoom: 0.99 },
+      { x: 0, y: 0, zoom: 2.01 },
+      { x: 0, y: 0 },
+      { x: 0, y: 0, zoom: 1, src: "https://example.com/image.png" },
+      "https://example.com/image.png",
+    ])
+      assert.equal(
+        projectSchema.safeParse({ ...legacy, [key]: invalid }).success,
+        false,
+        `${key} must validate the whole crop`,
+      );
+});
+
 test("cover crop never exposes empty pixels with tall or unequal sources", () => {
   for (const media of [
     { width: 800, height: 12000 },
@@ -90,4 +124,100 @@ test("server validates decoded images, not extension or MIME", async () => {
     .png()
     .toBuffer();
   assert.equal((await normalizeImage(tall)).height, 12000);
+});
+
+test("uploaded UI details and translucent logo edges retain their exact pixels", async () => {
+  const width = 160,
+    height = 120;
+  const pixels = Buffer.alloc(width * height * 4);
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++) {
+      const offset = (y * width + x) * 4;
+      // One-pixel colored lines expose chroma bleeding from a lossy conversion.
+      pixels[offset] = x % 3 === 0 ? 255 : 32;
+      pixels[offset + 1] = x % 3 === 1 ? 255 : 48;
+      pixels[offset + 2] = y % 2 === 0 ? 255 : 64;
+      pixels[offset + 3] = x < width / 3 ? 0 : x < (width * 2) / 3 ? 96 : 255;
+    }
+  const input = await sharp(pixels, { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer();
+  const normalized = await normalizeImage(input);
+  assert.equal(normalized.width, width);
+  assert.equal(normalized.height, height);
+  assert.ok(
+    (await sharp(normalized.data).ensureAlpha().raw().toBuffer()).equals(
+      pixels,
+    ),
+    "normalization must not soften fine UI lines or change translucent colors",
+  );
+});
+
+test("image preparation applies camera orientation before reporting dimensions", async () => {
+  const input = await sharp({
+    create: { width: 160, height: 96, channels: 3, background: "#365ddb" },
+  })
+    .composite([
+      {
+        input: await sharp({
+          create: {
+            width: 40,
+            height: 96,
+            channels: 3,
+            background: "#f24530",
+          },
+        })
+          .png()
+          .toBuffer(),
+        left: 0,
+        top: 0,
+      },
+    ])
+    .withMetadata({ orientation: 6 })
+    .png()
+    .toBuffer();
+  const normalized = await normalizeImage(input);
+  assert.equal(normalized.width, 96);
+  assert.equal(normalized.height, 160);
+  assert.ok(
+    (await sharp(normalized.data).ensureAlpha().raw().toBuffer()).equals(
+      await sharp(input).rotate().ensureAlpha().raw().toBuffer(),
+    ),
+    "orientation must rotate the pixels as well as the reported dimensions",
+  );
+  assert.equal(
+    (await sharp(normalized.data).metadata()).orientation,
+    undefined,
+  );
+});
+
+test("dense photos fit private input storage without reducing their dimensions", async () => {
+  const width = 2560,
+    height = 2600;
+  const pixels = Buffer.allocUnsafe(width * height * 3);
+  let seed = 739;
+  for (let index = 0; index < pixels.length; index++) {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    pixels[index] = seed & 255;
+  }
+  const input = await sharp(pixels, { raw: { width, height, channels: 3 } })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+  assert.ok(input.length < 10 * 1024 * 1024, "fixture is a valid upload");
+  const normalized = await normalizeImage(input);
+  assert.equal(normalized.width, width);
+  assert.equal(normalized.height, height);
+  assert.ok(
+    normalized.data.length <= 15 * 1024 * 1024,
+    "a prepared image must fit the existing private bucket limit",
+  );
+  const decoded = await sharp(normalized.data).raw().toBuffer();
+  assert.equal(decoded.length, pixels.length);
+  assert.equal(
+    decoded.equals(await sharp(input).raw().toBuffer()),
+    false,
+    "this dense fixture must exercise the bounded lossy fallback",
+  );
 });

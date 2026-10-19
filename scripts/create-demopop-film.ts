@@ -19,6 +19,7 @@ import {
 import { cleanupBundle, getBundle } from "../worker/render";
 
 const directory = "public/films";
+const logoFile = "public/brand/breakout-ink.png";
 const argumentsList = process.argv.slice(2);
 if (
   argumentsList.some(
@@ -76,6 +77,10 @@ if (
     await expect(
       page.getByRole("button", { name: "Play", exact: true }),
     ).toBeEnabled();
+    await page.getByLabel("Upload optional logo").setInputFiles(logoFile);
+    await expect(
+      page.getByRole("img", { name: "Project logo", exact: true }),
+    ).toHaveAttribute("src", /^blob:/);
     await page.getByLabel("Project name").fill(project.name);
     await page.getByLabel("Opening caption").fill(project.opening);
     await page.getByLabel("First highlight").fill(project.highlight1);
@@ -193,7 +198,11 @@ if (!argumentsList.includes("--capture-only")) {
     project,
     before: await image("demopop-before"),
     after: await image("demopop-after"),
-    logo: null,
+    logo: {
+      src: `data:image/png;base64,${(await readFile(logoFile)).toString("base64")}`,
+      width: 512,
+      height: 512,
+    },
   };
   try {
     const serveUrl = await getBundle();
@@ -295,6 +304,7 @@ if (!argumentsList.includes("--capture-only")) {
             maximumGopFrames: 15,
             keyframeCount: keyframes.length,
             posterFrame: 217,
+            brand: { mark: "Breakout", logo: logoFile },
             capture: {
               viewport: { width: 1440, height: 1000 },
               deviceScaleFactor: 2,

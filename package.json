@@ -25,12 +25,14 @@
     "cleanup": "tsx scripts/cleanup-storage.ts",
     "render:studio": "tsx scripts/render-studio-check.ts",
     "render:launch": "tsx scripts/render-launch.ts",
+    "render:kit": "tsx scripts/render-launch-kit.ts",
     "assets:launch": "tsx scripts/create-launch-assets.ts",
     "audio:launch": "tsx scripts/create-launch-audio.ts",
     "fonts:measure": "node scripts/measure-video-fonts.mjs",
     "render:quality": "tsx scripts/render-launch-quality.ts",
     "verify:launch": "tsx scripts/inspect-launch.ts",
-    "assets:home-film": "tsx scripts/create-demopop-film.ts"
+    "assets:home-film": "tsx scripts/create-demopop-film.ts",
+    "assets:campaign": "tsx scripts/create-campaign-demos.ts"
   },
   "dependencies": {
     "@fontsource-variable/manrope": "^5.2.8",
@@ -42,6 +44,7 @@
     "dotenv": "^17.3.1",
     "lucide-react": "^0.577.0",
     "next": "16.4.2",
+    "playwright-core": "1.64.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "remotion": "4.0.536",
