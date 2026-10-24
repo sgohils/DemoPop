@@ -77,7 +77,11 @@ export function projectHistory(
       const index = edited[0],
         before = current.story.scenes[index],
         after = value.story.scenes[index];
-      const fields = (Object.keys(before) as (keyof typeof before)[]).filter(
+      const fields = (
+        [
+          ...new Set([...Object.keys(before), ...Object.keys(after)]),
+        ] as (keyof typeof before)[]
+      ).filter(
         (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
       );
       if (
@@ -85,6 +89,24 @@ export function projectHistory(
         ["caption", "crop", "trimStart"].includes(fields[0])
       )
         group = `story:${before.id}:${fields[0]}`;
+      if (fields.length === 1 && fields[0] === "formatCrops") {
+        const formats = (
+          [
+            ...new Set([
+              ...Object.keys(before.formatCrops ?? {}),
+              ...Object.keys(after.formatCrops ?? {}),
+            ]),
+          ] as ProjectInput["format"][]
+        ).filter(
+          (format) =>
+            JSON.stringify(before.formatCrops?.[format]) !==
+            JSON.stringify(after.formatCrops?.[format]),
+        );
+        // Group a slider drag within one format. Resetting an override stays a
+        // separate action so Undo restores the framing it replaced.
+        if (formats.length === 1 && after.formatCrops?.[formats[0]])
+          group = `story:${before.id}:formatCrops:${formats[0]}`;
+      }
     }
   }
   if (

@@ -65,6 +65,17 @@ test("a link creates a complete branded story with actual website content and al
       { captures: assets.captures.slice(0, 2), logo: null },
     ),
   );
+  const feature = buildLinkVideo(source, { goal: "feature" }, assets);
+  assert.equal(feature.opening, "Product. A closer look.");
+  assert.equal(feature.story?.scenes[0].asset, assets.captures[1]);
+  assert.equal(feature.story?.scenes[0].caption, source.captures[1].caption);
+  assert.deepEqual(
+    new Set(projectAssetIds(feature)),
+    new Set(projectAssetIds(project)),
+  );
+  const reveal = buildLinkVideo(source, { goal: "redesign" }, assets);
+  assert.equal(reveal.opening, "A new look for Product.");
+  assert.equal(reveal.story?.scenes[0].asset, assets.captures[0]);
 });
 
 test("link requests accept bare domains but reject unsafe schemes, credentials and unsupported settings", () => {
@@ -83,6 +94,8 @@ test("link requests accept bare domains but reject unsafe schemes, credentials a
     { url: "https://product.example", duration: 25 },
     { url: "https://product.example", format: "4:3" },
     { url: "https://product.example", owner_id: randomUUID() },
+    { url: "https://product.example", goal: "invented" },
+    { url: "https://product.example", previewOnly: "true" },
   ]) {
     assert.equal(linkVideoRequestSchema.safeParse(body).success, false);
   }

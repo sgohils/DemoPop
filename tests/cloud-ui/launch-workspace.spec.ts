@@ -39,6 +39,8 @@ test("agency delivery captures package hooks, creates and revokes version review
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname,
       method = route.request().method();
+    if (path === "/api/metrics")
+      return void (await route.fulfill({ status: 204 }));
     let json: unknown;
     if (path === "/api/session") json = { signedIn: true, userId: owner };
     else if (path === "/api/brand-kits") json = { kits: [] };
@@ -156,6 +158,8 @@ test("client folders organize saved projects and account recipes reapply capture
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname,
       method = route.request().method();
+    if (path === "/api/metrics")
+      return void (await route.fulfill({ status: 204 }));
     let json: unknown;
     if (path === "/api/session") json = { signedIn: true, userId: owner };
     else if (path === "/api/brand-kits") json = { kits: [] };

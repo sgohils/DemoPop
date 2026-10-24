@@ -1,8 +1,14 @@
 # DemoPop
 
+Stripe payments: [setup and verification](docs/DEMOPOP_STRIPE_SETUP.md). Run `npm run billing:setup` to provision the test catalog and `npm run billing:check` to diagnose configuration. Apply Supabase migrations through `010_checkout_context.sql` before enabling purchases.
+
 Turn your product launch or website redesign into a video worth showing. A Next.js editor with four deterministic Remotion motion templates, vertical (1080 × 1920) and landscape (1920 × 1080) formats, and 15-second H.264 MP4 exports at 30 fps. The new Launch Film includes optional original sound design.
 
 ## Run locally
+
+The [paid launch workspace](docs/DEMOPOP_COMMERCIAL_IMPLEMENTATION.md) adds agency-focused pricing, $29 project packages, $79/month Studio, Stripe checkout/customer billing, transactional paid export allowances, and first-party funnel events. Apply every migration through **010** and configure the server-only Stripe settings before enabling purchases. The free manual preview remains available; paid exports require verified account access. No live payment or hosted rollout is implied by local checks.
+
+Payment prompts retain the saved project through plan selection, sign-in, Checkout cancellation and confirmed purchase. The first pending checkout keeps its original project destination when reused. A confirmed purchase offers a return to that owned project; the customer starts its export explicitly. URL parameters grant no payment or export access. Stripe account credentials remain unconfigured in this workspace.
 
 Use **Node 24 LTS** and npm. The lockfile pins the dependency tree; every Remotion package is 4.0.536.
 
@@ -44,7 +50,7 @@ For a local caption/color variation, set `SAMPLE_OVERRIDE` to a JSON file matchi
 
 ## Supabase setup
 
-1. Create a Supabase project. Apply all files in `supabase/migrations/` in numeric order through the SQL editor, or link the Supabase CLI and run `supabase db push`. Existing installations need every outstanding migration through **`007_launch_workspace.sql`**. Migration 007 adds Product Story assets, private MP4 clips, recipes, client reviews, ZIP packages, and their retention protections; new exports use `studio-6`. Stop the old web/worker processes, apply pending migrations, then deploy/restart both updated processes together. The updated worker accepts `reveal-1`, `studio-2`, `launch-3`, `launch-4`, `launch-5`, and `studio-6` jobs.
+1. Create a Supabase project. Apply all files in `supabase/migrations/` in numeric order through the SQL editor, or link the Supabase CLI and run `supabase db push`. Existing installations need every outstanding migration through **`010_checkout_context.sql`**. Migration 007 adds Product Story assets, private MP4 clips, recipes, client reviews, ZIP packages, and retention protections. Migration 008 adds paid project access, billing records and funnel events. Migration 009 adds safe interrupted-checkout recovery; migration 010 retains the saved project's return context. New exports use `studio-6`. Stop the old web/worker processes, apply pending migrations, then deploy/restart both updated processes together. The updated worker accepts `reveal-1`, `studio-2`, `launch-3`, `launch-4`, `launch-5`, and `studio-6` jobs.
 2. Enable email/password authentication. Set the Auth Site URL to your web origin and allow the confirmation callback, `/auth/confirm?next=/auth/reset`, and `/auth/confirm?next=%2Fcreate` on that origin as redirects. For development use `http://localhost:3000`.
 3. Use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=email` in the confirmation email template. Use `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery&next=/auth/reset` in the password recovery email template. The callback also supports PKCE `code` exchange. Configure SMTP and Supabase Auth rate limits for your deployment.
 4. Copy `.env.example` to `.env.local` for Next.js and to `.env` for the worker/CLI, and supply the values below. Restart/rebuild the web app after changing its configuration.
@@ -88,7 +94,7 @@ The worker claims one job with `FOR UPDATE SKIP LOCKED`, increments its attempt 
 
 Inputs: PNG/JPEG/WebP, 10 MB each, at least 64 × 64, maximum 40 megapixels, still images only. Signature checks and Sharp decoding reject corrupt/unsupported images. Orientation is normalized, images are bounded to 2560 × 12000 without enlargement, and encoded as lossless WebP to preserve small screenshot text and transparent logos. Only assets exceeding the existing 15 MB storage limit use a bounded high-quality fallback. Existing stored images keep their original encoding. Crop coordinates are normalized and cover math prevents exposed empty areas, including at extreme crop values. Inputs and outputs use owner/UUID paths; the worker accepts registered asset IDs and fixed sample IDs, never browser-supplied URLs or filesystem paths.
 
-Server-enforced hourly limits per user: 30 uploads, 20 project creations, 180 saves, 30 export requests, and 10 retry requests. New exports default to 10 per UTC day; retries also have a rolling daily cap of that value. Supabase enforces Auth rate limits. These are beta resource controls, with no billing system.
+Server-enforced hourly limits per user: 30 uploads, 20 project creations, 180 saves, 30 export requests, and 10 retry requests. Free-beta exports default to 10 render units per UTC day; paid installations default to 100 via `PAID_DAILY_EXPORT_CAP`. Retries retain separate resource controls. Purchased project allowances are enforced transactionally in addition to these resource limits. Supabase enforces Auth rate limits. See the [commercial setup](docs/DEMOPOP_COMMERCIAL_IMPLEMENTATION.md).
 
 ## Storage retention
 

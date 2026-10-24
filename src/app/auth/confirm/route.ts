@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
       req.cookies.get("demopop-auth-next")?.value,
   );
   const failure =
-    next === "/create"
-      ? "/auth?confirmation=failed&next=%2Fcreate"
+    next !== "/projects"
+      ? `/auth?confirmation=failed&next=${encodeURIComponent(next)}`
       : "/auth?confirmation=failed";
   if (!cloudConfigured())
     return NextResponse.redirect(new URL(failure, requestOrigin(req)));

@@ -12,7 +12,7 @@ test("automatic creation and the traditional studio are both directly accessible
   await expect(
     page
       .locator("[data-hero-intro]")
-      .getByRole("link", { name: "Create a video", exact: true }),
+      .getByRole("link", { name: "Create from a website", exact: true }),
   ).toHaveAttribute("href", "/create");
   await page
     .locator("#product")
@@ -40,6 +40,38 @@ const completed = {
   videoUrl: "/films/demopop-launch.mp4",
   downloadUrl: `${endpoint}/download`,
 };
+
+test("first visit shows a playable real export with honest sample dimensions", async ({
+  page,
+}) => {
+  await page.goto("/create");
+  const video = page.getByLabel("Orbit sample launch video", { exact: true });
+  await expect(video).toHaveAttribute("controls", "");
+  await expect(page.getByText("15 SEC / 16:9", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Orbit is a fictional sample product.", { exact: false }),
+  ).toBeVisible();
+  await video.evaluate(async (element: HTMLVideoElement) => {
+    await element.play();
+  });
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.currentTime),
+    )
+    .toBeGreaterThan(0);
+  await expect
+    .poll(() =>
+      video.evaluate((element: HTMLVideoElement) => element.videoWidth),
+    )
+    .toBe(960);
+  await video.evaluate((element: HTMLVideoElement) => element.pause());
+  await page.setViewportSize({ width: 320, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
 
 test("one website link automatically creates a finished video with progress and an MP4 download", async ({
   page,
@@ -447,6 +479,7 @@ test("an authentication handoff restores the source in a new tab without sharing
   expect(Object.keys(pending).sort()).toEqual([
     "duration",
     "format",
+    "goal",
     "savedAt",
     "url",
   ]);

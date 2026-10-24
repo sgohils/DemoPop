@@ -14,6 +14,10 @@ export function storyViewport(format: ProjectInput["format"]) {
     : { width: 936, height: format === "square" ? 530 : 850 };
 }
 
+export function storyCrop(scene: StoryScene, format: ProjectInput["format"]) {
+  return scene.formatCrops?.[format] ?? scene.crop;
+}
+
 export function launchHooks(project: ProjectInput): string[] {
   if (project.hooks) return project.hooks;
   const hooks = [
@@ -130,6 +134,7 @@ export function storyTimeline(project: ProjectInput) {
       Math.round((flexible * usedWeight) / weights);
     return {
       ...scene,
+      crop: storyCrop(scene, project.format),
       name: `Scene ${String(index + 1).padStart(2, "0")}`,
       start,
       end,

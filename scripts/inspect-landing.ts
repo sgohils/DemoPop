@@ -51,7 +51,7 @@ async function heroGeometry(page: Page) {
   return page.locator("[data-home-scroll]").evaluate((hero) => {
     const title = hero.querySelector("h1")!;
     const cta = Array.from(hero.querySelectorAll("a")).find((element) =>
-      element.textContent?.includes("Create a video"),
+      element.textContent?.includes("Create from a website"),
     )!;
     const film = hero.querySelector<HTMLVideoElement>(
       "video[aria-label='DemoPop launch film']",
@@ -132,7 +132,7 @@ try {
     const page = await browser.newPage({ viewport });
     page.on("pageerror", (error) => errors.push(`${name}: ${error.message}`));
     await page.goto(baseUrl, { waitUntil: "networkidle" });
-    await page.getByRole("heading", { name: /You built it\./ }).waitFor();
+    await page.getByRole("heading", { name: /Turn client websites/ }).waitFor();
     await page.waitForFunction(() => {
       const film = document.querySelector<HTMLVideoElement>(
         "video[aria-label='DemoPop launch film']",

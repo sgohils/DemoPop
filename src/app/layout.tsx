@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { NavigationGuard } from "../components/NavigationGuard";
 export const metadata: Metadata = {
-  title: "DemoPop — One product. A whole launch.",
+  title: "DemoPop — Client websites. Complete launch campaigns.",
   description:
-    "Turn your website, screenshots, and clips into branded launch videos. Create 15–60 second stories, export nine-video packages, and collect client feedback in one studio.",
+    "Turn client websites, screenshots, and clips into branded launch campaigns. Export nine-video packages, reuse your brand, and collect client approval in one studio.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

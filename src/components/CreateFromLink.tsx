@@ -1,7 +1,17 @@
 "use client";
+import { pricingPath } from "../shared/billing-context";
+import { trackPreview } from "../client/metrics";
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import {
+  projectSchema,
+  type ProjectInput,
+  type VideoProps,
+} from "../shared/project";
+import { VIDEO_GOALS } from "../shared/link-video";
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,7 +19,6 @@ import {
   ChevronDown,
   Download,
   ExternalLink,
-  Film,
   Globe,
   Loader2,
   Sparkles,
@@ -17,6 +26,23 @@ import {
 import { Brand } from "./Brand";
 import { BrandMark } from "./BrandMark";
 import styles from "./create-from-link.module.css";
+
+const DraftPreview = dynamic(
+  () => import("./Preview").then((module) => module.Preview),
+  {
+    ssr: false,
+    loading: () => (
+      <p className={styles.draftLoading} role="status">
+        Opening your motion preview…
+      </p>
+    ),
+  },
+);
+type WebsiteDraft = {
+  projectId: string;
+  project: ProjectInput;
+  media: Omit<VideoProps, "project">;
+};
 
 type Format = "landscape" | "vertical" | "square";
 type Status =
@@ -108,16 +134,45 @@ function readJob(body: Record<string, unknown>, id?: string): Job {
     videoUrl: safeMediaUrl(body.videoUrl),
     downloadUrl: safeMediaUrl(body.downloadUrl),
     error: typeof body.error === "string" ? body.error : undefined,
+    ...(["landscape", "vertical", "square"].includes(
+      body.outputFormat as string,
+    )
+      ? { outputFormat: body.outputFormat as Format }
+      : {}),
+    ...([15, 30, 60].includes(body.outputDuration as number)
+      ? { outputDuration: body.outputDuration as 15 | 30 | 60 }
+      : {}),
   };
 }
 
-export function CreateFromLink({ configured }: { configured: boolean }) {
+export function CreateFromLink({
+  configured,
+  billingRequired = true,
+}: {
+  configured: boolean;
+  billingRequired?: boolean;
+}) {
+  const router = useRouter();
   const [url, setUrl] = useState("");
   const [format, setFormat] = useState<Format>("landscape");
   const [duration, setDuration] = useState<15 | 30 | 60>(30);
+  const [goal, setGoal] = useState<"website" | "feature" | "redesign">(
+    "website",
+  );
+  const [draft, setDraft] = useState<WebsiteDraft | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
+  const [draftError, setDraftError] = useState("");
+  const [draftAttempt, setDraftAttempt] = useState(0);
+  const [mobileView, setMobileView] = useState<"story" | "preview">("preview");
+  const [restoreDraft, setRestoreDraft] = useState<{
+    id: string;
+    project?: ProjectInput;
+  } | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [needsPlan, setNeedsPlan] = useState(false);
   const [savedProjectId, setSavedProjectId] = useState<string | null>(null);
   const [pollError, setPollError] = useState("");
   const [authRequired, setAuthRequired] = useState(false);
@@ -129,12 +184,21 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
   const request = useRef<AbortController | null>(null);
   const generation = useRef(0);
   const submitLock = useRef(false);
-  const busy = submitting || active(job?.status);
+  const busy = submitting || saving || draftLoading || active(job?.status);
   const ready = job?.status === "completed" && Boolean(job.videoUrl);
   const jobId = job?.id;
   const isJobActive = active(job?.status);
   const outputFormat = job?.outputFormat ?? format;
   const outputDuration = job?.outputDuration ?? duration;
+  const previewProject = draft
+    ? {
+        ...draft.project,
+        format,
+        story: draft.project.story
+          ? { ...draft.project.story, duration }
+          : undefined,
+      }
+    : null;
   const recoveryProjectId =
     savedProjectId ?? (job?.status === "failed" ? job.projectId : undefined);
   const stage =
@@ -164,10 +228,13 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
             url: pending.url,
             format: pending.format,
             duration: pending.duration,
+            goal: pending.goal,
             savedAt: pending.savedAt,
           }
         : null);
     if (saved) {
+      if (["website", "feature", "redesign"].includes(saved.goal))
+        setGoal(saved.goal);
       if (typeof saved.url === "string") setUrl(saved.url.slice(0, 2048));
       if (["landscape", "vertical", "square"].includes(saved.format))
         setFormat(saved.format);
@@ -191,11 +258,23 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
               : 30,
         });
     }
+    if (
+      configured &&
+      saved &&
+      typeof saved.draftId === "string" &&
+      /^[a-f0-9-]{36}$/i.test(saved.draftId)
+    ) {
+      const project = projectSchema.safeParse(saved.draftProject);
+      setRestoreDraft({
+        id: saved.draftId,
+        ...(project.success ? { project: project.data } : {}),
+      });
+    }
     setHydrated(true);
     return () => {
       request.current?.abort();
     };
-  }, []);
+  }, [configured]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -206,6 +285,9 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
           url,
           format,
           duration,
+          goal,
+          draftId: draft?.projectId ?? restoreDraft?.id,
+          draftProject: draft?.project ?? restoreDraft?.project,
           id: job?.id,
           outputFormat: job?.outputFormat,
           outputDuration: job?.outputDuration,
@@ -219,11 +301,153 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
     url,
     format,
     duration,
+    goal,
+    draft,
+    restoreDraft,
     job?.id,
     job?.outputFormat,
     job?.outputDuration,
     hydrated,
   ]);
+
+  async function readDraft(id: string, signal?: AbortSignal) {
+    const response = await fetch(`/api/projects/${id}`, {
+      cache: "no-store",
+      signal,
+    });
+    const body = await response.json();
+    if (response.status === 401) setAuthRequired(true);
+    if (!response.ok)
+      throw new Error(
+        body.error || "Your draft could not be opened. Please retry.",
+      );
+    const project = projectSchema.parse(body.project);
+    if (!body.media?.before?.src || !body.media?.after?.src)
+      throw new Error("The preview images could not be loaded. Please retry.");
+    return { projectId: id, project, media: body.media } as WebsiteDraft;
+  }
+
+  useEffect(() => {
+    if (!restoreDraft) return;
+    const controller = new AbortController();
+    setDraftLoading(true);
+    setDraftError("");
+    void readDraft(restoreDraft.id, controller.signal)
+      .then((loaded) => {
+        if (!controller.signal.aborted) {
+          setDraft({
+            ...loaded,
+            project: restoreDraft.project ?? loaded.project,
+          });
+          if (!restoreDraft.project) {
+            setFormat(loaded.project.format);
+            setDuration(loaded.project.story?.duration ?? 15);
+          }
+          setMobileView("preview");
+          setDraftLoading(false);
+          setRestoreDraft(null);
+        }
+      })
+      .catch((cause) => {
+        if (!controller.signal.aborted) setDraftError(message(cause));
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDraftLoading(false);
+      });
+    return () => controller.abort();
+  }, [restoreDraft, draftAttempt]);
+
+  function editDraft(update: (project: ProjectInput) => ProjectInput) {
+    setDraft((current) =>
+      current ? { ...current, project: update(current.project) } : null,
+    );
+    setJob(null);
+    setNeedsPlan(false);
+    setError("");
+  }
+
+  async function refreshDraftMedia() {
+    if (!draft) return;
+    const id = draft.projectId;
+    setDraftError("");
+    try {
+      const loaded = await readDraft(id);
+      setDraft((current) =>
+        current?.projectId === id
+          ? { ...current, media: loaded.media }
+          : current,
+      );
+    } catch (cause) {
+      setDraftError(message(cause));
+    }
+  }
+
+  async function saveDraft(signal?: AbortSignal) {
+    if (!draft || !previewProject) throw new Error("Open your preview first.");
+    const parsed = projectSchema.safeParse(previewProject);
+    if (!parsed.success)
+      throw new Error(
+        "Add an opening headline, a caption for each scene, and a call to action before continuing.",
+      );
+    const saved = await fetch(`/api/projects/${draft.projectId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(parsed.data),
+      signal,
+    });
+    if (!saved.ok) {
+      if (saved.status === 401) setAuthRequired(true);
+      const failure = await saved.json();
+      throw new Error(
+        failure.error || "Your draft could not be saved. Please retry.",
+      );
+    }
+    return parsed.data;
+  }
+
+  async function leaveDraft(destination: "studio" | "new") {
+    if (!draft || busy || submitLock.current) return;
+    submitLock.current = true;
+    setSaving(true);
+    setError("");
+    try {
+      await saveDraft();
+      if (destination === "studio") {
+        try {
+          // Studio edits become the saved source of truth on return. Do not
+          // overlay them with this page's earlier session copy.
+          sessionStorage.setItem(
+            storageKey,
+            JSON.stringify({
+              url,
+              format,
+              duration,
+              goal,
+              draftId: draft.projectId,
+              savedAt: Date.now(),
+            }),
+          );
+        } catch {
+          /* browser storage is optional */
+        }
+        router.push(`/editor/${draft.projectId}`);
+      } else {
+        setDraft(null);
+        setRestoreDraft(null);
+        setJob(null);
+        setUrl("");
+        setNeedsPlan(false);
+        setDraftError("");
+        setSavedProjectId(null);
+      }
+    } catch (cause) {
+      setError(message(cause));
+      setMobileView("story");
+    } finally {
+      setSaving(false);
+      submitLock.current = false;
+    }
+  }
 
   useEffect(() => {
     if (!jobId || !isJobActive) return;
@@ -285,7 +509,7 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
 
   async function generate(event: React.FormEvent) {
     event.preventDefault();
-    if (submitLock.current || busy || !url.trim()) return;
+    if (submitLock.current || busy || restoreDraft || !url.trim()) return;
     submitLock.current = true;
     const current = ++generation.current;
     request.current?.abort();
@@ -293,6 +517,7 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
     request.current = controller;
     setSubmitting(true);
     setError("");
+    setNeedsPlan(false);
     setSavedProjectId(null);
     setPollError("");
     setAuthRequired(false);
@@ -300,20 +525,47 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
     setRefreshing(false);
     setJob(null);
     try {
-      const response = await fetch("/api/create-from-link", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim(), format, duration }),
-        signal: controller.signal,
-      });
+      let response: Response;
+      if (draft && previewProject) {
+        const project = await saveDraft(controller.signal);
+        response = await fetch("/api/exports", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId: draft.projectId,
+            project,
+            outputKind: "video",
+          }),
+          signal: controller.signal,
+        });
+      } else
+        response = await fetch("/api/create-from-link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: url.trim(),
+            format,
+            duration,
+            ...(goal !== "website" ? { goal } : {}),
+            ...(configured ? { previewOnly: true } : {}),
+          }),
+          signal: controller.signal,
+        });
       const body = await response.json();
       if (current !== generation.current || controller.signal.aborted) return;
+      if (response.status === 402) setNeedsPlan(true);
       if (response.status === 401) {
         setAuthRequired(true);
         try {
           localStorage.setItem(
             pendingStorageKey,
-            JSON.stringify({ url, format, duration, savedAt: Date.now() }),
+            JSON.stringify({
+              url,
+              format,
+              duration,
+              goal,
+              savedAt: Date.now(),
+            }),
           );
         } catch {
           // Same-tab authentication can still restore the session draft.
@@ -329,19 +581,61 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
           body.error || "Your video could not be started. Please try again.",
         );
       }
+      if (
+        body.status === "draft" &&
+        typeof body.projectId === "string" &&
+        /^[a-f0-9-]{36}$/i.test(body.projectId)
+      ) {
+        const pending = { id: body.projectId };
+        // Save the project reference before loading media; neither a reload nor
+        // a temporary image error should start a second website capture.
+        try {
+          sessionStorage.setItem(
+            storageKey,
+            JSON.stringify({
+              url,
+              format,
+              duration,
+              goal,
+              draftId: pending.id,
+              savedAt: Date.now(),
+            }),
+          );
+        } catch {
+          /* optional storage */
+        }
+        setRestoreDraft(pending);
+        try {
+          localStorage.removeItem(pendingStorageKey);
+        } catch {
+          /* optional storage */
+        }
+        return;
+      }
       setJob({
-        ...readJob(body),
+        ...readJob(draft ? { ...body, status: "queued" } : body),
+        ...(draft
+          ? {
+              mode: "cloud" as const,
+              status: "queued" as const,
+              projectId: draft.projectId,
+              progress: 0,
+            }
+          : {}),
         outputFormat: format,
         outputDuration: duration,
       });
+      setMobileView("preview");
       try {
         localStorage.removeItem(pendingStorageKey);
       } catch {
         // Clearing an optional handoff must not interrupt video creation.
       }
     } catch (cause) {
-      if (current === generation.current && !controller.signal.aborted)
+      if (current === generation.current && !controller.signal.aborted) {
         setError(message(cause));
+        setMobileView("story");
+      }
     } finally {
       if (current === generation.current && !controller.signal.aborted)
         setSubmitting(false);
@@ -408,7 +702,11 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
   }
 
   return (
-    <div className={styles.page}>
+    <div
+      className={styles.page}
+      data-has-draft={Boolean(draft)}
+      data-view={mobileView}
+    >
       <header className={`site-header ${styles.header}`}>
         <Brand />
         <nav className={styles.headerNav} aria-label="Creation navigation">
@@ -420,6 +718,24 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
           </Link>
         </nav>
       </header>
+      {draft && (
+        <nav className={styles.mobileTabs} aria-label="Draft workspace">
+          <button
+            type="button"
+            aria-pressed={mobileView === "story"}
+            onClick={() => setMobileView("story")}
+          >
+            Edit story
+          </button>
+          <button
+            type="button"
+            aria-pressed={mobileView === "preview"}
+            onClick={() => setMobileView("preview")}
+          >
+            Motion preview
+          </button>
+        </nav>
+      )}
       <main className={styles.main}>
         <section className={styles.intro} aria-labelledby="create-title">
           <div className={styles.eyebrow}>
@@ -430,10 +746,31 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
             <br />A little <em>louder.</em>
           </h1>
           <p className={styles.description}>
-            One link becomes a complete launch video. We capture your product,
-            pick up your branding, and put it all in motion.
+            Start with your real website.{" "}
+            {configured
+              ? "Review the motion, refine the story, then export when it feels right."
+              : "Choose a direction and turn it into a branded launch film."}
           </p>
-          <form className={styles.form} onSubmit={generate}>
+          <ol className={styles.journey} aria-label="Video creation steps">
+            {["Your website", "Review the story", "Export & deliver"].map(
+              (step, index) => (
+                <li
+                  key={step}
+                  aria-current={
+                    (ready ? 2 : draft ? 1 : 0) === index ? "step" : undefined
+                  }
+                >
+                  <span>{index + 1}</span>
+                  {step}
+                </li>
+              ),
+            )}
+          </ol>
+          <form
+            id="website-video-form"
+            className={styles.form}
+            onSubmit={generate}
+          >
             <label htmlFor="create-website">Your website link</label>
             <div className={styles.urlField}>
               <Globe size={19} aria-hidden="true" />
@@ -450,14 +787,103 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
                 onChange={(event) => {
                   setUrl(event.target.value);
                   setAuthRequired(false);
+                  setDraft(null);
+                  setRestoreDraft(null);
+                  setDraftError("");
                 }}
-                disabled={busy}
+                disabled={busy || Boolean(draft) || Boolean(restoreDraft)}
                 aria-describedby="create-help"
               />
             </div>
             <p id="create-help" className={styles.hint}>
-              Use a public website. No screenshots or editing needed.
+              {configured
+                ? "Free personalized preview with an account. A package activates only when you export."
+                : "Use a public website. Or try your own screenshots in the studio."}
             </p>
+            {!draft && (
+              <fieldset className={styles.goals} disabled={busy}>
+                <legend>What are you sharing?</legend>
+                <div>
+                  {VIDEO_GOALS.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      aria-pressed={goal === item.id}
+                      onClick={() => setGoal(item.id)}
+                    >
+                      <strong>{item.name}</strong>
+                      <span>{item.description}</span>
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+            )}
+            {draft && (
+              <fieldset className={styles.storyFields} disabled={busy}>
+                <legend>Your story. Your words.</legend>
+                <p>
+                  Changes appear in the motion preview. Fine-tune shots in the
+                  studio.
+                </p>
+                <label>
+                  Opening headline
+                  <textarea
+                    rows={2}
+                    maxLength={70}
+                    value={draft.project.opening}
+                    onChange={(event) =>
+                      editDraft((p) => ({ ...p, opening: event.target.value }))
+                    }
+                  />
+                </label>
+                {draft.project.story?.scenes.map((scene, index) => (
+                  <label key={scene.id}>
+                    Scene {index + 1}
+                    <textarea
+                      rows={2}
+                      maxLength={70}
+                      value={scene.caption}
+                      onChange={(event) =>
+                        editDraft((p) => ({
+                          ...p,
+                          story: {
+                            ...p.story!,
+                            scenes: p.story!.scenes.map((s) =>
+                              s.id === scene.id
+                                ? { ...s, caption: event.target.value }
+                                : s,
+                            ),
+                          },
+                        }))
+                      }
+                    />
+                  </label>
+                ))}
+                <div className={styles.storyRow}>
+                  <label>
+                    Call to action
+                    <input
+                      maxLength={36}
+                      value={draft.project.cta}
+                      onChange={(event) =>
+                        editDraft((p) => ({ ...p, cta: event.target.value }))
+                      }
+                    />
+                  </label>
+                  <label>
+                    Client folder <span>(optional)</span>
+                    <input
+                      maxLength={60}
+                      value={draft.project.client || ""}
+                      placeholder="e.g. North Studio"
+                      onChange={(event) =>
+                        editDraft((p) => ({ ...p, client: event.target.value }))
+                      }
+                    />
+                  </label>
+                </div>
+              </fieldset>
+            )}
             <details className={styles.options}>
               <summary>
                 <span>Video options</span>
@@ -509,27 +935,40 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
                 className={`button primary ${styles.generate}`}
                 href="/auth?next=%2Fcreate"
               >
-                Sign in to generate <ArrowRight size={18} />
+                {configured || draft
+                  ? "Sign in to preview"
+                  : "Sign in to generate"}{" "}
+                <ArrowRight size={18} />
               </Link>
             ) : (
               <button
                 type="submit"
                 className={`button primary ${styles.generate}`}
-                disabled={busy || !hydrated || !url.trim()}
+                disabled={
+                  busy || !hydrated || !url.trim() || Boolean(restoreDraft)
+                }
               >
                 {busy ? (
                   <>
-                    <Loader2 size={18} className={styles.spin} /> Creating your
-                    video…
+                    <Loader2 size={18} className={styles.spin} />{" "}
+                    {saving
+                      ? "Saving your draft…"
+                      : configured && !draft
+                        ? "Preparing your preview…"
+                        : "Creating your video…"}
                   </>
                 ) : (
                   <>
                     <Sparkles size={18} />{" "}
-                    {job?.status === "failed"
-                      ? "Try again"
-                      : ready
-                        ? "Generate another video"
-                        : "Generate video"}
+                    {draft
+                      ? "Export MP4"
+                      : configured
+                        ? "Preview your video"
+                        : job?.status === "failed"
+                          ? "Try again"
+                          : ready
+                            ? "Generate another video"
+                            : "Generate video"}
                     <ArrowRight size={18} />
                   </>
                 )}
@@ -540,6 +979,15 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
                 {error ||
                   job?.error ||
                   "Your video could not finish. Please try again."}
+                {needsPlan && draft && (
+                  <>
+                    {" "}
+                    Your reviewed draft is saved.{" "}
+                    <Link href={pricingPath({ projectId: draft.projectId })}>
+                      Choose a package to export →
+                    </Link>
+                  </>
+                )}
                 {recoveryProjectId && (
                   <>
                     {" "}
@@ -553,10 +1001,23 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
           </form>
           <p className={styles.footnote}>
             {configured
-              ? "Sign in when prompted. Your video and editable project are saved to your account."
+              ? billingRequired
+                ? ready
+                  ? "Edit and export revisions within this project's 30-day package window. Each new website starts a separate project."
+                  : "Preview first, pay when you export. The same project includes a 30-day revision window after activation."
+                : "Sign in when prompted. Your video and editable project are saved to your account."
               : "Local videos expire after 45 minutes. Download your MP4 to keep it."}
           </p>
           <div className={styles.included}>
+            {needsPlan && (
+              <Link
+                href={pricingPath({
+                  projectId: draft?.projectId ?? recoveryProjectId,
+                })}
+              >
+                Choose a launch package →
+              </Link>
+            )}
             <span>
               <Check size={14} /> Real website captures
             </span>
@@ -571,11 +1032,17 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
         <section className={styles.output} aria-label="Generated video">
           <div className={styles.outputBar}>
             <span>
-              <span className={styles.liveDot} /> DEMOPOP — YOUR LAUNCH FILM
+              <span className={styles.liveDot} />{" "}
+              {draft && !job
+                ? "YOUR EDITABLE DRAFT"
+                : job
+                  ? "DEMOPOP — YOUR LAUNCH FILM"
+                  : "ORBIT / REAL SAMPLE EXPORT"}
             </span>
             <span>
-              {outputDuration.toString().padStart(2, "0")} SEC /{" "}
-              {outputFormat === "landscape"
+              {(draft || job ? outputDuration : 15).toString().padStart(2, "0")}{" "}
+              SEC /{" "}
+              {(!draft && !job) || outputFormat === "landscape"
                 ? "16:9"
                 : outputFormat === "vertical"
                   ? "9:16"
@@ -593,6 +1060,10 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
                   playsInline
                   aria-label="Your generated launch video"
                   onError={() => setPlaybackError(true)}
+                  onLoadedData={() => {
+                    if (job?.mode === "cloud" && job.projectId)
+                      trackPreview(job.projectId);
+                  }}
                 />
               </div>
               <div className={styles.result}>
@@ -635,6 +1106,48 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
                 </div>
               )}
             </>
+          ) : draft &&
+            previewProject &&
+            !submitting &&
+            !draftLoading &&
+            !isJobActive ? (
+            <div className={styles.draftOutput}>
+              <DraftPreview
+                input={{ project: previewProject, ...draft.media }}
+                onRetry={() => void refreshDraftMedia()}
+                onReady={() => trackPreview(draft.projectId)}
+              />
+              <div className={styles.draftSummary}>
+                <span>PRIVATE PREVIEW · NOT AN EXPORT</span>
+                <h2>Make it yours before it goes out.</h2>
+                <p>
+                  Review the words and framing. Your package starts when you
+                  export, with the same captured screens.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void leaveDraft("studio")}
+                  disabled={busy}
+                >
+                  Open the full studio <ExternalLink size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void leaveDraft("new")}
+                  disabled={busy}
+                >
+                  Save & start another website <ArrowRight size={14} />
+                </button>
+                <button
+                  type="submit"
+                  form="website-video-form"
+                  className={`button primary ${styles.mobileExport}`}
+                  disabled={busy}
+                >
+                  Export MP4 <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
           ) : job?.status === "completed" ? (
             <div className={styles.working}>
               <div className={styles.status}>
@@ -734,32 +1247,21 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
             </div>
           ) : (
             <div className={styles.empty}>
-              <div className={styles.previewArt} aria-hidden="true">
-                <div className={styles.previewBrowser}>
-                  <div>
-                    <i />
-                    <i />
-                    <i />
-                    <span>your next big thing</span>
-                  </div>
-                  <BrandMark />
-                  <span>Made to stand out.</span>
-                </div>
-                <div className={styles.floatingLabel}>
-                  <Film size={14} /> Website → launch film
-                </div>
-              </div>
+              <video
+                className={styles.sampleVideo}
+                src="/films/campaign/landscape-original.mp4"
+                poster="/films/campaign/landscape-original.webp"
+                controls
+                preload="none"
+                playsInline
+                aria-label="Orbit sample launch video"
+              />
               <div className={styles.emptyCopy}>
-                <span>ONE LINK. THE WHOLE STORY.</span>
-                <h2>
-                  From live site
-                  <br />
-                  to launch night.
-                </h2>
+                <span>REAL SCREENS. REAL OUTPUT.</span>
+                <h2>This is the kind of launch you can make.</h2>
                 <p>
-                  Your captures, branding, and motion.
-                  <br />
-                  One finished video.
+                  Orbit is a fictional sample product. Play the actual export,
+                  then start with your own website.
                 </p>
               </div>
             </div>
@@ -768,6 +1270,39 @@ export function CreateFromLink({ configured }: { configured: boolean }) {
             <span>CAPTURE. CREATE. CELEBRATE.</span>
             <BrandMark />
           </div>
+          {draftError && (
+            <div className={styles.previewRecovery} role="alert">
+              <p>{draftError}</p>
+              <button
+                type="button"
+                onClick={() =>
+                  restoreDraft
+                    ? setDraftAttempt((value) => value + 1)
+                    : void refreshDraftMedia()
+                }
+              >
+                Retry opening preview
+              </button>
+              {restoreDraft && (
+                <>
+                  <Link href={`/editor/${restoreDraft.id}`}>
+                    Open saved draft in studio
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRestoreDraft(null);
+                      setDraftError("");
+                      setJob(null);
+                      setUrl("");
+                    }}
+                  >
+                    Start with another website
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </section>
       </main>
       <footer className={styles.footer}>

@@ -1,12 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type CSSProperties } from "react";
 import { BrandMark } from "./BrandMark";
 import styles from "./launch-scroll.module.css";
 
 const FILM = "/films/demopop-launch.mp4";
 const POSTER = "/films/demopop-launch-poster.webp";
+// Give the opening, product reveal, and closing identity room to be read.
+// Scroll remains native; these cues only direct the film inside its sticky stage.
+const FILM_CUES = [
+  { at: 0, frame: 0 },
+  { at: 0.1, frame: 0 },
+  { at: 0.38, frame: 0.34 },
+  { at: 0.46, frame: 0.34 },
+  { at: 0.64, frame: 0.72 },
+  { at: 0.72, frame: 0.72 },
+  { at: 0.9, frame: 0.98 },
+  { at: 1, frame: 0.98 },
+];
+function easeBetween(value: number, start: number, end: number) {
+  const progress = Math.max(0, Math.min(1, (value - start) / (end - start)));
+  return progress * progress * progress * (progress * (progress * 6 - 15) + 10);
+}
+function filmProgress(value: number) {
+  const index = FILM_CUES.findIndex((cue) => cue.at > value);
+  if (index < 1) return FILM_CUES.at(-1)!.frame;
+  const before = FILM_CUES[index - 1];
+  const after = FILM_CUES[index];
+  return (
+    before.frame +
+    (after.frame - before.frame) * easeBetween(value, before.at, after.at)
+  );
+}
 const CHAPTERS = [
   {
     at: 0,
@@ -14,29 +40,40 @@ const CHAPTERS = [
     name: "The hook",
     detail: "Make the first second count.",
     headline: "Build the\nintrigue.",
+    cue: 0,
   },
   {
-    at: 0.22,
+    at: 0.1,
     number: "02",
     name: "The reveal",
     detail: "Give your product its moment.",
     headline: "Make the\nreveal.",
+    cue: 0.4,
   },
   {
-    at: 0.39,
+    at: 0.46,
     number: "03",
     name: "The proof",
     detail: "Show what makes it different.",
     headline: "Show the\ndifference.",
+    cue: 0.65,
   },
   {
-    at: 0.79,
+    at: 0.72,
     number: "04",
     name: "Your next launch",
     detail: "Leave them wanting to try it.",
     headline: "Leave a\nmark.",
+    cue: 0.94,
   },
 ];
+
+const chapterStyle = (index: number): CSSProperties =>
+  ({
+    "--chapter-weight": index === 0 ? 1 : 0,
+    "--chapter-shift": index === 0 ? 0 : 1,
+    visibility: index === 0 ? "visible" : "hidden",
+  }) as CSSProperties;
 
 function Arrow({ diagonal = false }: { diagonal?: boolean }) {
   return (
@@ -55,10 +92,11 @@ export function LaunchScroll() {
   const section = useRef<HTMLElement>(null);
   const stage = useRef<HTMLDivElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const filmFrame = useRef<HTMLDivElement>(null);
   const progress = useRef<HTMLProgressElement>(null);
-  const chapterNumber = useRef<HTMLSpanElement>(null);
-  const chapterName = useRef<HTMLSpanElement>(null);
-  const chapterDetail = useRef<HTMLSpanElement>(null);
+  const chapterDescription = useRef<HTMLSpanElement>(null);
+  const chapterRail = useRef<HTMLElement>(null);
+  const filmTime = useRef<HTMLSpanElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const fullFilm = useRef<HTMLVideoElement>(null);
   const watchButton = useRef<HTMLButtonElement>(null);
@@ -66,8 +104,6 @@ export function LaunchScroll() {
   const intro = useRef<HTMLDivElement>(null);
   const mobileChapter = useRef<HTMLDivElement>(null);
   const bottomBar = useRef<HTMLDivElement>(null);
-  const mobileChapterKicker = useRef<HTMLSpanElement>(null);
-  const mobileChapterHeadline = useRef<HTMLParagraphElement>(null);
   const unlockPage = useRef<(() => void) | null>(null);
 
   useEffect(() => {
@@ -89,11 +125,26 @@ export function LaunchScroll() {
     let layoutDirty = true;
     const introLinks = Array.from(intro.current?.querySelectorAll("a") ?? []);
     let copyInteractive: boolean | null = null;
+    let displayedSecond = -1;
+    const cueButtons = Array.from(
+      chapterRail.current?.querySelectorAll("button") ?? [],
+    );
+    const chapterLayers = CHAPTERS.map((_, index) =>
+      Array.from(
+        surface.querySelectorAll<HTMLElement>(
+          `[data-chapter-layer="${index}"]`,
+        ),
+      ),
+    );
+    const chapterWeights: number[] = CHAPTERS.map((_, index) =>
+      index === 0 ? 1 : 0,
+    );
+    let previousChapterPosition = 0;
     let layout = {
       start: 0,
       distance: 1,
       height: 1,
-      stageHeight: 1,
+      filmCenter: 1,
       filmHeight: 1,
       introBottom: 0,
       chapterBottom: 0,
@@ -108,8 +159,10 @@ export function LaunchScroll() {
         start: bounds.top + window.scrollY,
         distance: Math.max(1, bounds.height - window.innerHeight),
         height: bounds.height,
-        stageHeight: surface.clientHeight,
-        filmHeight: (surface.clientWidth * 0.92 * 9) / 16,
+        filmCenter: filmFrame.current?.offsetTop ?? surface.clientHeight / 2,
+        filmHeight:
+          ((filmFrame.current?.offsetWidth ?? surface.clientWidth * 0.92) * 9) /
+          16,
         introBottom: intro.current
           ? intro.current.offsetTop + intro.current.offsetHeight + 24
           : 0,
@@ -176,69 +229,121 @@ export function LaunchScroll() {
         displayedAmount === null || motion.matches || !visible
           ? targetAmount
           : displayedAmount +
-            (targetAmount - displayedAmount) * (1 - Math.exp(-elapsed / 90));
+            (targetAmount - displayedAmount) * (1 - Math.exp(-elapsed / 140));
       if (Math.abs(targetAmount - amount) < 0.0001) amount = targetAmount;
       displayedAmount = amount;
       previousTime = now;
-      const expansion = Math.min(1, amount / 0.42);
-      const eased = expansion * expansion * (3 - 2 * expansion);
-      const copyExit = Math.max(
-        0,
-        Math.min(1, (amount - 0.025) / (mobile.matches ? 0.18 : 0.22)),
-      );
-      const chapterEntrance = Math.max(0, Math.min(1, (amount - 0.205) / 0.11));
-      const initialScale = mobile.matches ? 0.96 : 0.59;
+      const eased = easeBetween(amount, 0.06, 0.42);
+      const copyExit = easeBetween(amount, 0.1, mobile.matches ? 0.3 : 0.33);
+      const copyOpacity = 1 - easeBetween(copyExit, 0, 0.85);
+      const chapterEntrance = easeBetween(amount, 0.32, 0.4);
+      const initialScale = mobile.matches ? 0.94 : 0.84;
       const nextChapter = CHAPTERS.findLastIndex((item) => amount >= item.at);
+      const firstChapter = currentChapter < 0;
       if (nextChapter !== currentChapter) {
         currentChapter = nextChapter;
         const next = CHAPTERS[Math.max(0, nextChapter)];
-        if (chapterNumber.current)
-          chapterNumber.current.textContent = next.number;
-        if (chapterName.current) chapterName.current.textContent = next.name;
-        if (chapterDetail.current)
-          chapterDetail.current.textContent = next.detail;
-        if (mobileChapterKicker.current)
-          mobileChapterKicker.current.textContent = `${next.number} / ${next.name}`;
-        if (mobileChapterHeadline.current)
-          mobileChapterHeadline.current.textContent = next.headline;
-        // A chapter can have a different text height; measure once at the swap.
-        if (mobile.matches) measure();
+        if (chapterDescription.current)
+          chapterDescription.current.textContent = `${next.number}. ${next.name}. ${next.detail}`;
+        cueButtons.forEach((button, index) => {
+          if (index === nextChapter)
+            button.setAttribute("aria-current", "step");
+          else button.removeAttribute("aria-current");
+        });
       }
+      // Keep every caption in a shared grid cell: changes never resize the
+      // film's available space. Blend to the new chapter in time, so stopping
+      // at a scroll boundary cannot leave two half-visible headlines behind.
+      let chapterAnimating = false;
+      const previousWeights = [...chapterWeights];
+      const blend =
+        motion.matches || firstChapter ? 1 : 1 - Math.exp(-elapsed / 80);
+      for (let index = 0; index < chapterWeights.length; index++) {
+        const target = index === nextChapter ? 1 : 0;
+        const weight =
+          chapterWeights[index] + (target - chapterWeights[index]) * blend;
+        chapterWeights[index] =
+          Math.abs(target - weight) < 0.001 ? target : weight;
+        if (chapterWeights[index] !== target) chapterAnimating = true;
+      }
+      const chapterPosition = chapterWeights.reduce(
+        (sum, weight, index) => sum + weight * index,
+        0,
+      );
+      for (let index = 0; index < chapterWeights.length; index++) {
+        const weight = chapterWeights[index];
+        if (
+          weight === previousWeights[index] &&
+          (weight === 0 || chapterPosition === previousChapterPosition)
+        )
+          continue;
+        for (const layer of chapterLayers[index]) {
+          layer.style.visibility = weight === 0 ? "hidden" : "visible";
+          layer.style.setProperty("--chapter-weight", weight.toFixed(4));
+          if (weight > 0)
+            layer.style.setProperty(
+              "--chapter-shift",
+              `${Math.max(-1, Math.min(1, index - chapterPosition))}`,
+            );
+        }
+      }
+      previousChapterPosition = chapterPosition;
       let filmFit = 1;
-      let filmY = 12 * (1 - eased);
-      if (mobile.matches && !motion.matches) {
+      let filmY = 0;
+      if (!motion.matches) {
+        // Reserve the outgoing copy's actual space until its fade is nearly
+        // complete. Expanding toward the next chapter too early puts the
+        // description and CTA over the moving film.
+        const outgoingTop = Math.max(
+          layout.chapterBottom,
+          layout.introBottom - 70 * copyExit,
+        );
+        const spaceExit = easeBetween(copyExit, 0.6, 1);
         const top =
-          layout.introBottom +
-          (layout.chapterBottom - layout.introBottom) * copyExit;
+          outgoingTop + (layout.chapterBottom - outgoingTop) * spaceExit;
         const height = Math.max(
           1,
           Math.min(layout.filmHeight, layout.bottom - top),
         );
         filmFit = height / layout.filmHeight;
-        filmY = top + (layout.bottom - top) / 2 - layout.stageHeight / 2;
+        filmY = top + (layout.bottom - top) / 2 - layout.filmCenter;
       }
 
       surface.style.setProperty(
         "--film-scale",
         `${(initialScale + (1 - initialScale) * eased) * filmFit}`,
       );
-      surface.style.setProperty(
-        "--film-x",
-        `${mobile.matches ? 0 : 22 * (1 - eased)}vw`,
-      );
+      surface.style.setProperty("--film-x", "0px");
       surface.style.setProperty("--film-y", `${filmY}px`);
+      surface.style.setProperty("--film-rotate", "0deg");
+      // All depth layers follow the same eased native scroll position. The
+      // backdrop is a static poster, so immersion needs only one video decoder.
+      const immersion = motion.matches ? 0 : eased;
+      surface.style.setProperty("--immersion", `${immersion}`);
       surface.style.setProperty(
-        "--film-rotate",
-        `${mobile.matches ? 0 : -5 * (1 - eased)}deg`,
+        "--film-tilt",
+        `${(1 - immersion) * (mobile.matches ? 3 : 8)}deg`,
       );
-      surface.style.setProperty("--copy-opacity", `${1 - copyExit}`);
+      surface.style.setProperty("--film-roll", `${(1 - immersion) * -1.2}deg`);
+      surface.style.setProperty("--film-radius", `${12 - 8 * immersion}px`);
+      surface.style.setProperty("--frame-opacity", `${1 - immersion}`);
+      surface.style.setProperty("--backdrop-y", `${30 - 85 * amount}px`);
+      surface.style.setProperty("--orbit-turn", `${-18 + 24 * amount}deg`);
+      surface.style.setProperty("--echo-y", `${70 - 140 * amount}px`);
+      surface.style.setProperty("--ambient-x", `${-4 + 8 * amount}%`);
+      surface.dataset.immersion = immersion.toFixed(3);
+      surface.style.setProperty("--copy-opacity", `${copyOpacity}`);
+      surface.style.setProperty(
+        "--copy-visibility",
+        copyOpacity < 0.001 ? "hidden" : "visible",
+      );
       surface.style.setProperty("--copy-y", `${-70 * copyExit}px`);
       surface.style.setProperty("--chapter-opacity", `${chapterEntrance}`);
       surface.style.setProperty(
         "--chapter-y",
         `${20 * (1 - chapterEntrance)}px`,
       );
-      const interactive = copyExit < 0.98;
+      const interactive = copyOpacity > 0.1;
       if (interactive !== copyInteractive) {
         copyInteractive = interactive;
         surface.style.setProperty(
@@ -258,11 +363,18 @@ export function LaunchScroll() {
       if (loaded && Number.isFinite(film.duration)) {
         targetTime = Math.max(
           0,
-          Math.min(film.duration - 0.06, amount * film.duration),
+          Math.min(film.duration - 0.06, filmProgress(amount) * film.duration),
         );
         seek();
+        const second = Math.floor(targetTime);
+        if (second !== displayedSecond && filmTime.current) {
+          displayedSecond = second;
+          filmTime.current.textContent = `00:${String(second).padStart(2, "0")} / 00:15`;
+        }
       }
-      if (amount !== targetAmount) schedule();
+      const settled = amount === targetAmount && !chapterAnimating;
+      surface.dataset.scrollSettled = String(settled);
+      if (!settled) schedule();
       else previousTime = 0;
     };
     const schedule = () => {
@@ -333,6 +445,21 @@ export function LaunchScroll() {
     };
   }, []);
 
+  const jumpToChapter = (cue: number) => {
+    const hero = section.current;
+    if (!hero) return;
+    const reduced = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
+    window.scrollTo({
+      top:
+        hero.getBoundingClientRect().top +
+        window.scrollY +
+        (hero.clientHeight - window.innerHeight) * cue,
+      behavior: reduced ? "instant" : "smooth",
+    });
+  };
+
   const watch = () => {
     const player = fullFilm.current;
     if (!dialog.current || !player || dialog.current.open) return;
@@ -381,6 +508,7 @@ export function LaunchScroll() {
       ref={section}
       className={styles.hero}
       data-home-scroll
+      id="launch-scroll"
       data-scroll-progress="0"
       data-reduced-motion="false"
       aria-label="Meet DemoPop"
@@ -389,29 +517,50 @@ export function LaunchScroll() {
         Skip the film
       </a>
       <div ref={stage} className={styles.stage} data-scroll-progress="0">
+        <div className={styles.sceneBackdrop} aria-hidden="true" />
         <div className={styles.ambient} aria-hidden="true" />
+        <div className={styles.orbit} aria-hidden="true">
+          <span />
+          <span />
+          <span />
+        </div>
+        {CHAPTERS.map((chapter, index) => (
+          <span
+            key={chapter.number}
+            className={styles.chapterEcho}
+            aria-hidden="true"
+            data-chapter-layer={index}
+            style={chapterStyle(index)}
+          >
+            {chapter.number}
+          </span>
+        ))}
         <div className={styles.coordinates} aria-hidden="true">
           <span>DEMOPOP / MOTION SYSTEM 01</span>
           <span>BUILT TO BE SEEN.</span>
         </div>
         <div ref={intro} className={styles.intro} data-hero-intro>
           <p className={styles.eyebrow}>
-            <span /> YOUR PRODUCT. A WHOLE LAUNCH.
+            <span /> FOR WEB AGENCIES & DESIGNERS
           </p>
           <h1>
-            You built it.
+            Turn client websites
             <br />
-            <span>Now launch it.</span>
+            <span>into launch campaigns.</span>
           </h1>
-          <p className={styles.description}>
-            Give your product a launch worth watching. Your story, your
-            branding, and a little motion.
-          </p>
-          <div className={styles.actions}>
-            <Link ref={createButton} href="/create" className={styles.create}>
-              Create a video <Arrow />
-            </Link>
-            <span className={styles.noSetup}>Your product. In motion.</span>
+          <div className={styles.introFooter}>
+            <p className={styles.description}>
+              Start with your website. Preview a branded launch video before
+              paying, then collect client approval and deliver every format.
+            </p>
+            <div className={styles.actions}>
+              <Link ref={createButton} href="/create" className={styles.create}>
+                Create from a website <Arrow />
+              </Link>
+              <a href="#campaign" className={styles.noSetup}>
+                See a sample package ↗
+              </a>
+            </div>
           </div>
         </div>
 
@@ -426,22 +575,28 @@ export function LaunchScroll() {
           data-hero-chapter
           aria-hidden="true"
         >
-          <span
-            ref={mobileChapterKicker}
-            className={styles.mobileChapterKicker}
-          >
-            01 / The hook
-          </span>
-          <p ref={mobileChapterHeadline}>Build the{"\n"}intrigue.</p>
+          {CHAPTERS.map((chapter, index) => (
+            <div
+              key={chapter.number}
+              className={styles.chapterPanel}
+              data-chapter-layer={index}
+              style={chapterStyle(index)}
+            >
+              <span className={styles.mobileChapterKicker}>
+                {chapter.number} / {chapter.name}
+              </span>
+              <p>{chapter.headline}</p>
+            </div>
+          ))}
         </div>
 
-        <div className={styles.filmPosition}>
+        <div ref={filmFrame} className={styles.filmPosition}>
           <div className={styles.film}>
             <div className={styles.frameTop} aria-hidden="true">
               <span>
                 <i /> DEMOPOP — THE LAUNCH FILM
               </span>
-              <span>00:15 / 16:9</span>
+              <span ref={filmTime}>00:00 / 00:15</span>
             </div>
             {/* A poster is also the useful, zero-JavaScript fallback. */}
             <video
@@ -460,19 +615,50 @@ export function LaunchScroll() {
           </div>
         </div>
 
+        <nav
+          ref={chapterRail}
+          className={styles.chapterRail}
+          aria-label="Film chapters"
+        >
+          {CHAPTERS.map((chapter, index) => (
+            <button
+              key={chapter.number}
+              type="button"
+              aria-label={`Scroll to ${chapter.name}`}
+              aria-controls="launch-scroll"
+              aria-current={index === 0 ? "step" : undefined}
+              onClick={() => jumpToChapter(chapter.cue)}
+            >
+              <span>{chapter.number}</span>
+              <i aria-hidden="true" />
+              <span className={styles.railName}>{chapter.name}</span>
+            </button>
+          ))}
+        </nav>
+
         <div ref={bottomBar} className={styles.bottomBar} data-hero-transport>
           <div className={styles.chapter}>
-            <span ref={chapterNumber} className={styles.chapterNumber}>
-              01
+            <span
+              ref={chapterDescription}
+              className={styles.chapterDescription}
+            >
+              01. The hook. Make the first second count.
             </span>
-            <div>
-              <span ref={chapterName} className={styles.chapterName}>
-                The hook
-              </span>
-              <span ref={chapterDetail} className={styles.chapterDetail}>
-                Make the first second count.
-              </span>
-            </div>
+            {CHAPTERS.map((chapter, index) => (
+              <div
+                key={chapter.number}
+                className={styles.chapterSummary}
+                data-chapter-layer={index}
+                style={chapterStyle(index)}
+                aria-hidden="true"
+              >
+                <span className={styles.chapterNumber}>{chapter.number}</span>
+                <div>
+                  <span className={styles.chapterName}>{chapter.name}</span>
+                  <span className={styles.chapterDetail}>{chapter.detail}</span>
+                </div>
+              </div>
+            ))}
           </div>
           <div className={styles.transport}>
             <span className={styles.scrollLabel}>

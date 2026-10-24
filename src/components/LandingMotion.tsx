@@ -54,7 +54,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
             node.dataset.active = String(entry.isIntersecting);
           }
         },
-        { threshold: 0.12, rootMargin: "0px 0px -24px 0px" },
+        { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
       );
       nodes.forEach((node) => observer?.observe(node));
     };
@@ -100,7 +100,7 @@ export function ProductStory() {
   const [active, setActive] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div className={styles.story} data-reveal data-animate>
+    <div className={styles.story} data-reveal="media" data-animate>
       <div className={styles.storyControls}>
         <div
           className={styles.storyTabs}

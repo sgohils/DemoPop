@@ -89,6 +89,14 @@ export const storySceneSchema = z
     asset: assetIdSchema,
     caption: z.string().trim().min(1).max(70),
     crop: cropSchema,
+    formatCrops: z
+      .object({
+        vertical: cropSchema.optional(),
+        landscape: cropSchema.optional(),
+        square: cropSchema.optional(),
+      })
+      .strict()
+      .optional(),
     weight: z.number().int().min(1).max(5),
     trimStart: z.number().min(0).max(29).default(0),
   })

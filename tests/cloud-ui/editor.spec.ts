@@ -28,6 +28,8 @@ async function mockApi(
   const unexpected: string[] = [];
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
+    if (path === "/api/metrics")
+      return void (await route.fulfill({ status: 204 }));
     const method = route.request().method();
     if (await handler(route, path, method)) return;
     if (path === "/api/brand-kits" && method === "GET") {
@@ -399,6 +401,8 @@ test("reusing an export describes its earlier snapshot and keeps later edits uns
     if (path === "/api/session") return json(route, { signedIn: true });
     if (path === `/api/projects/${projectId}` && method === "GET")
       return json(route, { project: sampleProject, media: sampleMedia() });
+    if (path === `/api/projects/${projectId}` && method === "PUT")
+      return json(route, { ok: true });
     if (path === "/api/exports" && method === "POST") {
       submitted.push(route.request().postDataJSON());
       releaseExport = () => json(route, { id: jobId, reused: true });

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Package, Link2, Copy, Loader2, X } from "lucide-react";
+import { Package, Link2, Copy, Loader2, X, Play } from "lucide-react";
 import { launchHooks } from "../shared/launch-kit";
 import type { ProjectInput } from "../shared/project";
 import type { HistoryJob } from "./ExportHistory";
@@ -27,6 +27,7 @@ export function LaunchDelivery({
   revision,
   onHooks,
   onExport,
+  onPreview,
 }: {
   project: ProjectInput;
   projectId: string | null;
@@ -35,6 +36,7 @@ export function LaunchDelivery({
   revision: string;
   onHooks: (hooks: string[]) => void;
   onExport: () => void;
+  onPreview: () => void;
 }) {
   const [jobs, setJobs] = useState<HistoryJob[]>([]),
     [jobId, setJobId] = useState(""),
@@ -125,7 +127,8 @@ export function LaunchDelivery({
             Package hook {index + 1}
             <small>{hook.length}/70</small>
           </span>
-          <input
+          <textarea
+            rows={2}
             maxLength={70}
             value={hook}
             onChange={(event) =>
@@ -138,6 +141,13 @@ export function LaunchDelivery({
           />
         </label>
       ))}
+      <button
+        type="button"
+        className="button secondary small package-preview-action"
+        onClick={onPreview}
+      >
+        <Play size={14} /> Preview 9 versions
+      </button>
       <button
         className="button primary small"
         disabled={!authorized || busy || hooks.some((hook) => !hook.trim())}

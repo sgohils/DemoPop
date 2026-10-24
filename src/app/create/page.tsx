@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { CreateFromLink } from "../../components/CreateFromLink";
 import { cloudConfigured } from "../../server/supabase";
+import { billingEnabled } from "../../server/stripe";
 
 export const metadata: Metadata = {
   title: "Create from link — DemoPop",
@@ -9,5 +10,10 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <CreateFromLink configured={cloudConfigured()} />;
+  return (
+    <CreateFromLink
+      configured={cloudConfigured()}
+      billingRequired={billingEnabled()}
+    />
+  );
 }

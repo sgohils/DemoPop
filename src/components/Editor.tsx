@@ -1,4 +1,5 @@
 "use client";
+import { trackPreview } from "../client/metrics";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -18,6 +19,7 @@ import {
   Undo2,
   Redo2,
   ArrowLeftRight,
+  Package,
 } from "lucide-react";
 import "./editor.css";
 import "./launch-tools.css";
@@ -38,9 +40,10 @@ import { StoryEditor } from "./StoryEditor";
 import { WebsiteImport } from "./WebsiteImport";
 import { RecipeLibrary } from "./RecipeLibrary";
 import { LaunchDelivery } from "./LaunchDelivery";
+import { PackagePreview, type PackageSelection } from "./PackagePreview";
 import { localMedia } from "../client/media";
 import type { WebsiteImport as WebsiteResult } from "../server/website-import";
-import type { OutputKind } from "../shared/launch-kit";
+import { packageVariants, type OutputKind } from "../shared/launch-kit";
 import {
   sampleProject,
   sampleAsset,
@@ -59,6 +62,7 @@ import {
   projectAssetIds,
 } from "../shared/project";
 import { videoScenes } from "../shared/scenes";
+import { pricingPath } from "../shared/billing-context";
 type Job = HistoryJob;
 class ApiError extends Error {
   constructor(
@@ -131,9 +135,25 @@ export function Editor({
     [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [needsPlan, setNeedsPlan] = useState(false);
+  const [previewReady, setPreviewReady] = useState(false);
+  const [packageSelection, setPackageSelection] =
+    useState<PackageSelection | null>(null);
+  const trackedPreviewOwner = useRef<string | null>(null);
   const [authenticated, setAuthenticated] = useState<boolean | null>(
     configured ? null : false,
   );
+  useEffect(() => {
+    if (
+      previewReady &&
+      authenticated &&
+      userId &&
+      trackedPreviewOwner.current !== userId
+    ) {
+      trackedPreviewOwner.current = userId;
+      trackPreview(id || undefined);
+    }
+  }, [previewReady, authenticated, userId, id]);
   const [refreshError, setRefreshError] = useState("");
   const refreshMedia = useRef<() => Promise<void>>(async () => {});
   const sessionVersion = useRef(0);
@@ -155,7 +175,12 @@ export function Editor({
   const draftDirty =
     dirty &&
     (!!id || JSON.stringify(project) !== JSON.stringify(initialProject));
-  const dimensions = videoSettings(project);
+  const previewProject = packageSelection
+    ? packageVariants(project).filter(
+        (variant) => variant.project.format === packageSelection.format,
+      )[packageSelection.hook].project
+    : project;
+  const dimensions = videoSettings(previewProject);
   const storyAssetKey = JSON.stringify(
     project.story?.scenes.map((scene) => scene.asset) ?? [],
   );
@@ -173,6 +198,7 @@ export function Editor({
   function moveHistory(direction: "undo" | "redo") {
     const target = direction === "undo" ? history.previous : history.next;
     if (!target || uploading || saving || exporting) return;
+    setPackageSelection(null);
     setMedia({
       before: assetCatalog.current.get(target.before) || media.before,
       after: assetCatalog.current.get(target.after) || media.after,
@@ -213,6 +239,40 @@ export function Editor({
     const frame =
       videoScenes(project).find((scene) => scene.name === name)?.preview || 0;
     setFocusFrame((value) => ({ frame, request: (value?.request || 0) + 1 }));
+    setPackageSelection(null);
+  }
+  function previewPackage(
+    selection: PackageSelection = { format: project.format, hook: 0 },
+  ) {
+    setPackageSelection(selection);
+    setMobile("preview");
+    const variant = packageVariants(project).filter(
+      (variant) => variant.project.format === selection.format,
+    )[selection.hook].project;
+    setFocusFrame((value) => ({
+      frame: videoScenes(variant)[0].preview,
+      request: (value?.request || 0) + 1,
+    }));
+    requestAnimationFrame(() =>
+      document
+        .getElementById("motion-preview")
+        ?.scrollIntoView({ block: "start" }),
+    );
+  }
+  function editPackageFraming() {
+    if (!packageSelection || !project.story) return;
+    setProject((current) => ({ ...current, format: packageSelection.format }));
+    setPackageSelection(null);
+    setMobile("settings");
+    requestAnimationFrame(() => {
+      const framing = document.querySelector<HTMLDetailsElement>(
+        "#story-settings .story-card details",
+      );
+      if (framing) {
+        framing.open = true;
+        framing.querySelector<HTMLInputElement>('input[type="range"]')?.focus();
+      }
+    });
   }
   useUnsavedChanges(!loading && !loadError && draftDirty);
   function handleAuthFailure(failure: unknown, epoch: number) {
@@ -327,6 +387,7 @@ export function Editor({
         if (!live) return;
         loadedId.current = initialId;
         setId(initialId);
+        setPackageSelection(null);
         resetProject(data.project);
         setMedia({ ...data.media, sceneMedia: data.media.sceneMedia || {} });
         setSaved(JSON.stringify(data.project));
@@ -475,6 +536,7 @@ export function Editor({
         sceneMedia: Object.fromEntries(sources),
       });
       history.apply(draft.project);
+      setPackageSelection(null);
       setNotice("Browser draft restored.");
     } catch (failure) {
       reportFailure(failure);
@@ -505,6 +567,8 @@ export function Editor({
     key: K,
     value: ProjectInput[K],
   ) {
+    if (key === "format" || key === "template" || key === "opening")
+      setPackageSelection(null);
     setProject((p) => ({ ...p, [key]: value }));
     setNotice("");
   }
@@ -553,6 +617,7 @@ export function Editor({
     setExporting(true);
     setError("");
     setNotice("");
+    setNeedsPlan(false);
     try {
       const p = validated();
       let projectId = id;
@@ -566,7 +631,8 @@ export function Editor({
           "",
           `/editor/${projectId}`,
         );
-      }
+      } else await api(`projects/${projectId}`, "PUT", p);
+      setSaved(JSON.stringify(p));
       const data = await api("exports", "POST", {
         projectId,
         project: p,
@@ -588,6 +654,7 @@ export function Editor({
             : "Export started. Later edits apply to your next export.",
       );
     } catch (e) {
+      if (e instanceof ApiError && e.status === 402) setNeedsPlan(true);
       reportFailure(e, epoch);
     } finally {
       setExporting(false);
@@ -649,6 +716,7 @@ export function Editor({
     }
   }
   async function applyWebsite(result: WebsiteResult) {
+    setPackageSelection(null);
     setUploading("website");
     try {
       const captures: { id: string; media: Media; caption: string }[] = [];
@@ -1032,6 +1100,13 @@ export function Editor({
           </small>
         </div>
         <div className="header-actions">
+          <Link
+            href="/billing"
+            className="text-link"
+            aria-label="Plans and billing"
+          >
+            Billing
+          </Link>
           <div className="history-controls" aria-label="Edit history">
             <button
               aria-label="Undo"
@@ -1092,7 +1167,13 @@ export function Editor({
             ) : (
               <Download size={16} />
             )}
-            <span>{activeJob ? "Export in progress" : "Export video"}</span>
+            <span>
+              {activeJob
+                ? "Export in progress"
+                : packageSelection
+                  ? "Export main film"
+                  : "Export video"}
+            </span>
           </button>
         </div>
       </header>
@@ -1124,6 +1205,14 @@ export function Editor({
               <X size={15} />
             </button>
           </div>
+        )}
+        {needsPlan && (
+          <p className="notice">
+            <Link href={pricingPath({ projectId: id })}>
+              Choose your launch package →
+            </Link>{" "}
+            Return to this saved project after checkout to export.
+          </p>
         )}
         {refreshError && (
           <div className="error editor-message" role="alert">
@@ -1314,12 +1403,13 @@ export function Editor({
                 })
               }
               onUpload={uploadStory}
-              onSeek={(frame) =>
+              onSeek={(frame) => {
+                setPackageSelection(null);
                 setFocusFrame((value) => ({
                   frame,
                   request: (value?.request || 0) + 1,
-                }))
-              }
+                }));
+              }}
             />
             {field("name", "Project name", 60)}
             {field("opening", "Opening caption", 70, true)}
@@ -1515,6 +1605,7 @@ export function Editor({
               revision={`${job?.id || ""}/${job?.status || ""}`}
               onHooks={(hooks) => update("hooks", hooks)}
               onExport={() => void startExport("launch-pack")}
+              onPreview={() => previewPackage()}
             />
           </section>
           <div className="sidebar-end">
@@ -1522,12 +1613,17 @@ export function Editor({
           </div>
         </aside>
         <main
+          id="motion-preview"
           className={`preview-panel ${mobile === "preview" ? "mobile-visible" : ""}`}
         >
           <div className="preview-heading">
             <div>
               <span className="eyebrow">LIVE PREVIEW</span>
-              <h2>Your work, in motion.</h2>
+              <h2>
+                {packageSelection
+                  ? `Hook 0${packageSelection.hook + 1} · ${packageSelection.format}`
+                  : "Your work, in motion."}
+              </h2>
             </div>
             <span className="template-tag">
               <span className="blue-dot" />{" "}
@@ -1549,10 +1645,32 @@ export function Editor({
               </Link>
             </div>
           )}
+          {packageSelection ? (
+            <PackagePreview
+              project={project}
+              selection={packageSelection}
+              onChange={previewPackage}
+              onClose={() => {
+                setPackageSelection(null);
+                showScene("Opening");
+              }}
+              onEditFraming={editPackageFraming}
+            />
+          ) : (
+            <button
+              className="package-preview-open"
+              type="button"
+              onClick={() => previewPackage()}
+            >
+              <Package size={15} /> Preview launch package{" "}
+              <span>3 hooks × 3 formats</span>
+            </button>
+          )}
           <div className="editor-stage">
             <div className="editor-stage-grid" />
             <Preview
-              input={{ project, ...media } as VideoProps}
+              onReady={() => setPreviewReady(true)}
+              input={{ project: previewProject, ...media } as VideoProps}
               onRetry={() => void refreshMedia.current()}
               scenes
               focusFrame={focusFrame}
@@ -1560,8 +1678,8 @@ export function Editor({
           </div>
           <div className="preview-footer">
             <span>
-              {project.format.toUpperCase()} <span>·</span> {dimensions.width} ×{" "}
-              {dimensions.height} <span>·</span> 30 FPS
+              {previewProject.format.toUpperCase()} <span>·</span>{" "}
+              {dimensions.width} × {dimensions.height} <span>·</span> 30 FPS
             </span>
             <span>
               <kbd>Space</kbd> Play / pause

@@ -7,7 +7,7 @@ test("sample preview and desktop editor really play, scrub and update", async ({
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/");
   await expect(
-    page.getByRole("heading", { name: /You built it/ }),
+    page.getByRole("heading", { name: /Turn client websites/ }),
   ).toBeVisible();
   await page.locator("#styles").scrollIntoViewIfNeeded();
   await expect(
@@ -49,7 +49,9 @@ test("sample preview and desktop editor really play, scrub and update", async ({
     .fill("Your next chapter starts here.");
   await page.getByLabel("First highlight").fill("Beautifully considered.");
   await expect(
-    page.getByText("Beautifully considered.", { exact: true }),
+    page
+      .locator(".editor-stage .video-shell")
+      .getByText("Beautifully considered.", { exact: true }),
   ).toBeVisible();
   await page.getByLabel("Choose brand color").fill("#884433");
   await expect(

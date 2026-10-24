@@ -7,6 +7,24 @@ import {
 } from "./project";
 import type { WebsiteImport } from "../server/website-import";
 
+export const VIDEO_GOALS = [
+  {
+    id: "website",
+    name: "Website launch",
+    description: "Introduce the whole product.",
+  },
+  {
+    id: "feature",
+    name: "Feature spotlight",
+    description: "Bring one detail into focus.",
+  },
+  {
+    id: "redesign",
+    name: "Client reveal",
+    description: "Give a new website its moment.",
+  },
+] as const;
+
 export const linkVideoRequestSchema = z
   .object({
     url: z
@@ -34,11 +52,13 @@ export const linkVideoRequestSchema = z
     duration: z
       .union([z.literal(15), z.literal(30), z.literal(60)])
       .default(30),
+    goal: z.enum(["website", "feature", "redesign"]).optional(),
+    previewOnly: z.boolean().optional(),
   })
   .strict();
 export type LinkVideoOptions = Pick<
   z.infer<typeof linkVideoRequestSchema>,
-  "format" | "duration"
+  "format" | "duration" | "goal"
 >;
 
 /** Keep complete words and graphemes within the renderer's copy limits. */
@@ -69,13 +89,23 @@ export function buildLinkVideo(
       "The website needs three captured views to create a video.",
     );
   const name = linkVideoCopy(website.name || new URL(website.url).hostname, 60);
-  const opening = linkVideoCopy(website.opening || `Meet ${name}.`, 70);
+  const opening = linkVideoCopy(
+    options.goal === "redesign"
+      ? `A new look for ${name}.`
+      : options.goal === "feature"
+        ? `${name}. A closer look.`
+        : website.opening || `Meet ${name}.`,
+    70,
+  );
   const description =
     "description" in website && typeof website.description === "string"
       ? website.description
       : "";
-  const captions = website.captures.slice(0, 3).map((capture, index) => {
-    const source = index === 0 && description ? description : capture.caption;
+  const order = options.goal === "feature" ? [1, 0, 2] : [0, 1, 2];
+  const captions = order.map((captureIndex, index) => {
+    const capture = website.captures[captureIndex];
+    const source =
+      captureIndex === 0 && description ? description : capture.caption;
     return linkVideoCopy(
       source && source.trim() !== opening
         ? source
@@ -100,8 +130,8 @@ export function buildLinkVideo(
     color: website.color,
     url: linkVideoCopy(new URL(website.url).hostname, 80),
     sourceUrl: website.url,
-    before: assets.captures[0],
-    after: assets.captures[1],
+    before: assets.captures[order[0]],
+    after: assets.captures[order[1]],
     logo: assets.logo,
     beforeCrop: { ...defaultCrop },
     afterCrop: { ...defaultCrop },
@@ -109,7 +139,7 @@ export function buildLinkVideo(
       duration: options.duration ?? 30,
       scenes: captions.map((caption, index) => ({
         id: crypto.randomUUID(),
-        asset: assets.captures[index],
+        asset: assets.captures[order[index]],
         caption,
         crop: { ...defaultCrop },
         weight: 3,

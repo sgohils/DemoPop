@@ -16,6 +16,8 @@ async function setup(
     const path = new URL(route.request().url()).pathname,
       method = route.request().method();
     if (await handler(route, path, method)) return;
+    if (path === "/api/metrics")
+      return void (await route.fulfill({ status: 204 }));
     if (path === "/api/session")
       return void (await respond(route, { signedIn: true, userId: owner }));
     if (path === "/api/brand-kits" && method === "GET")
