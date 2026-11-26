@@ -614,7 +614,6 @@ export function CreateFromLink({
           }),
           signal: controller.signal,
         });
-      const body = await response.json();
       if (current !== generation.current || controller.signal.aborted) return;
       if (response.status === 402) setNeedsPlan(true);
       if (response.status === 401) {
@@ -634,6 +633,11 @@ export function CreateFromLink({
           // Same-tab authentication can still restore the session draft.
         }
       }
+      const body = await readResponseObject(
+        response,
+        "The video service returned an unreadable response. Please try again.",
+      );
+      if (current !== generation.current || controller.signal.aborted) return;
       if (!response.ok) {
         if (
           typeof body.projectId === "string" &&
@@ -641,7 +645,9 @@ export function CreateFromLink({
         )
           setSavedProjectId(body.projectId);
         throw new Error(
-          body.error || "Your video could not be started. Please try again.",
+          typeof body.error === "string"
+            ? body.error
+            : "Your video could not be started. Please try again.",
         );
       }
       if (
