@@ -26,7 +26,11 @@ assert.equal(metadata.height, expected.height);
 assert.equal(metadata.fps, expected.fps);
 assert.equal(metadata.codec, "h264");
 assert.equal(metadata.pixelFormat, "yuv420p");
-assert.ok(Math.abs(metadata.durationInSeconds! - 15) < 0.1);
+const expectedDuration = expected.durationInFrames / expected.fps;
+assert.ok(
+  Math.abs(metadata.durationInSeconds! - expectedDuration) < 0.1,
+  `Expected a ${expectedDuration}-second video, got ${metadata.durationInSeconds}.`,
+);
 const qa = process.env.QA_DIR || "out/qa";
 await mkdir(qa, { recursive: true });
 await writeFile(
@@ -40,7 +44,10 @@ const ffmpeg = RenderInternals.getExecutablePath({
   logLevel: "error",
   binariesDirectory: null,
 });
-const times = [1, 3, 5.7, 6.4, 8, 10.5, 13.5];
+const samplePoints = [0.07, 0.2, 0.38, 0.43, 0.53, 0.7, 0.9];
+const times = samplePoints.map((point) =>
+  Math.min(expectedDuration - 1 / expected.fps, expectedDuration * point),
+);
 const tiles = [];
 const tileHeight = 480;
 const tileWidth = Math.round(tileHeight * (metadata.width / metadata.height));
