@@ -28,6 +28,7 @@ export function ExportHistory({
   onUnauthorized: () => void;
 }) {
   const [jobs, setJobs] = useState<HistoryJob[]>([]),
+    [loadedFor, setLoadedFor] = useState(""),
     [more, setMore] = useState(false),
     [offset, setOffset] = useState(0);
   const [error, setError] = useState(""),
@@ -46,6 +47,9 @@ export function ExportHistory({
         if (response.status === 401) onUnauthorized();
         if (!response.ok) throw new Error(body.error);
         if (live) {
+          if (!Array.isArray(body.jobs))
+            throw new Error("Export history returned an unexpected response.");
+          if (offset === 0) setLoadedFor(projectId);
           setJobs((existing) =>
             offset === 0
               ? body.jobs
@@ -102,6 +106,10 @@ export function ExportHistory({
       setBusy(null);
     }
   }
+  // A project switch can render once before the new request effect runs. Keep
+  // the previous project's exports out of that transition (and its failures).
+  const visibleJobs = loadedFor === projectId ? jobs : [];
+  const hasMore = loadedFor === projectId && more;
   return (
     <section className="export-history" aria-labelledby="export-history-title">
       <div className="history-heading">
@@ -122,11 +130,11 @@ export function ExportHistory({
           {error}
         </p>
       )}
-      {!jobs.length && !loading && !error && (
+      {!visibleJobs.length && !loading && !error && (
         <p className="section-hint">Your exported versions will appear here.</p>
       )}
       <ul>
-        {jobs.map((job) => (
+        {visibleJobs.map((job) => (
           <li key={job.id} className="history-row">
             <div>
               <strong>
@@ -176,7 +184,7 @@ export function ExportHistory({
         ))}
       </ul>
       {loading && <p role="status">Loading export history…</p>}
-      {more && (
+      {hasMore && (
         <button
           className="button secondary small"
           disabled={loading}
