@@ -361,6 +361,7 @@ export function CreateFromLink({
     const mediaObject = media as Record<string, unknown>;
     if (!isMedia(mediaObject.before) || !isMedia(mediaObject.after))
       throw new Error("The preview images could not be loaded. Please retry.");
+    if (!signal?.aborted) setAuthRequired(false);
     return {
       projectId: id,
       project,
