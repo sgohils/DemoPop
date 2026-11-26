@@ -493,12 +493,22 @@ export function Projects({ configured }: { configured: boolean }) {
             {!matchingProjects.length && (
               <div className={styles.noResults}>
                 <Search size={24} />
-                <h2>No projects match that search.</h2>
+                <h2>
+                  {query.trim()
+                    ? "No projects match those filters."
+                    : "No projects in this client folder."}
+                </h2>
                 <p>
-                  Try another name, or clear the search to see your projects.
+                  Clear the search and client filter to see all your projects.
                 </p>
-                <button className="text-link" onClick={() => setQuery("")}>
-                  Clear search <X size={13} />
+                <button
+                  className="text-link"
+                  onClick={() => {
+                    setQuery("");
+                    setFolder("");
+                  }}
+                >
+                  Clear filters <X size={13} />
                 </button>
               </div>
             )}
