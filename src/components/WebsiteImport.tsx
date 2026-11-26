@@ -61,7 +61,9 @@ export function WebsiteImport({
 
   useEffect(
     () => () => {
-      captureController.current?.abort();
+      const controller = captureController.current;
+      captureController.current = null;
+      controller?.abort();
     },
     [],
   );
@@ -101,8 +103,10 @@ export function WebsiteImport({
             ? body.error
             : "Website import could not finish.",
         );
+      if (captureController.current !== controller) return;
       setResult(readImportResult(body));
     } catch (error) {
+      if (captureController.current !== controller) return;
       if (timedOut) {
         setError("Website capture took too long. Please retry the capture.");
       } else if (!controller.signal.aborted) {
@@ -114,10 +118,19 @@ export function WebsiteImport({
       }
     } finally {
       window.clearTimeout(timeout);
-      if (captureController.current === controller)
+      if (captureController.current === controller) {
         captureController.current = null;
-      if (!controller.signal.aborted || timedOut) setBusy(false);
+        setBusy(false);
+      }
     }
+  }
+  function cancelCapture() {
+    const controller = captureController.current;
+    if (!controller) return;
+    captureController.current = null;
+    controller.abort();
+    setBusy(false);
+    setError("Website capture canceled. You can try again when you’re ready.");
   }
   return (
     <div className="website-import kit-panel">
@@ -172,6 +185,11 @@ export function WebsiteImport({
               Opening the public page and preparing three screenshots. This can
               take up to 35 seconds.
             </p>
+          )}
+          {busy && (
+            <button type="button" className="text-link" onClick={cancelCapture}>
+              <X size={13} /> Cancel capture
+            </button>
           )}
           {error && (
             <p className="error" role="alert">
