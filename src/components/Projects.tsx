@@ -167,14 +167,19 @@ export function Projects({ configured }: { configured: boolean }) {
       setSigningOut(false);
     }
   }
-  const matchingProjects = projects.filter(
-    (project) =>
-      `${project.name} ${project.client || ""}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()) &&
+  const matchingProjects = projects.filter((project) => {
+    const templateName =
+      TEMPLATES.find((template) => template.id === project.template)?.name ||
+      "";
+    const searchable = `${project.name} ${project.client || ""} ${project.format || ""} ${templateName}`;
+    return (
+      searchable.toLowerCase().includes(query.trim().toLowerCase()) &&
       (!folder ||
-        (folder === "__unfiled" ? !project.client : project.client === folder)),
-  );
+        (folder === "__unfiled"
+          ? !project.client
+          : project.client === folder))
+    );
+  });
   const folders = [
     ...new Set(
       projects
