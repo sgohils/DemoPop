@@ -12,7 +12,8 @@ function readImportResult(value: unknown): ImportResult {
   const result = value as Partial<ImportResult>;
   const validCaptures =
     Array.isArray(result.captures) &&
-    result.captures.length === 3 &&
+    result.captures.length >= 3 &&
+    result.captures.length <= 6 &&
     result.captures.every(
       (capture) =>
         capture &&
@@ -66,7 +67,14 @@ export function WebsiteImport({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
       });
-      const body: unknown = await response.json();
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error(
+          "The website capture returned an unreadable response. Please retry the capture.",
+        );
+      }
       if (!response.ok)
         throw new Error(
           body &&
