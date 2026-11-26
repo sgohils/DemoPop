@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -42,6 +42,7 @@ export function StoryEditor({
   const [busy, setBusy] = useState<string | null>(null),
     [error, setError] = useState(""),
     [announcement, setAnnouncement] = useState("");
+  const sceneHeadingRefs = useRef(new Map<string, HTMLButtonElement>());
   const story = project.story;
   const timeline = storyTimeline(project);
   const edit = (
@@ -172,7 +173,15 @@ export function StoryEditor({
                   onFocusCapture={seek}
                 >
                   <div className="story-card-heading">
-                    <button type="button" className="text-link" onClick={seek}>
+                    <button
+                      ref={(element) => {
+                        if (element) sceneHeadingRefs.current.set(scene.id, element);
+                        else sceneHeadingRefs.current.delete(scene.id);
+                      }}
+                      type="button"
+                      className="text-link"
+                      onClick={seek}
+                    >
                       Scene {String(index + 1).padStart(2, "0")}
                     </button>
                     <span>
@@ -224,14 +233,27 @@ export function StoryEditor({
                         type="button"
                         aria-label={`Remove scene ${index + 1}`}
                         disabled={story.scenes.length <= 3 || !!busy}
-                        onClick={() =>
+                        onClick={() => {
+                          const nextFocus =
+                            story.scenes[index + 1] ?? story.scenes[index - 1];
+                          const nextPosition =
+                            index + 1 < story.scenes.length
+                              ? index + 1
+                              : index;
                           onChange({
                             ...story,
                             scenes: story.scenes.filter(
                               (item) => item.id !== scene.id,
                             ),
-                          })
-                        }
+                          });
+                          setAnnouncement(
+                            `Scene ${index + 1} removed.${nextFocus ? ` Focus moved to scene ${nextPosition}.` : ""}`,
+                          );
+                          if (nextFocus)
+                            requestAnimationFrame(() =>
+                              sceneHeadingRefs.current.get(nextFocus.id)?.focus(),
+                            );
+                        }}
                       >
                         <Trash2 size={13} />
                       </button>

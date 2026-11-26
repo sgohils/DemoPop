@@ -29,6 +29,14 @@ test("product stories support six scenes, timing, reorder, framing, media replac
   await expect(
     page.getByRole("group", { name: /^Story scene \d$/ }),
   ).toHaveCount(6);
+  await page.getByRole("button", { name: "Remove scene 3" }).click();
+  await expect(
+    page.getByRole("button", { name: "Scene 03", exact: true }),
+  ).toBeFocused();
+  await expect(page.locator(".story-builder").getByRole("status")).toContainText(
+    "Scene 3 removed. Focus moved to scene 3.",
+  );
+  await page.getByRole("button", { name: "Add scene", exact: true }).click();
   await page
     .getByRole("button", { name: "Move scene 1 down", exact: true })
     .click();
