@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Globe, Loader2, ArrowRight, X } from "lucide-react";
 import type { WebsiteImport as ImportResult } from "../server/website-import";
 
@@ -57,15 +57,32 @@ export function WebsiteImport({
     [applying, setApplying] = useState(false),
     [error, setError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const captureController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      captureController.current?.abort();
+    },
+    [],
+  );
+
   async function capture() {
     setBusy(true);
     setError("");
     setResult(null);
+    const controller = new AbortController();
+    captureController.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 45_000);
     try {
       const response = await fetch("/api/website-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
+        signal: controller.signal,
       });
       let body: unknown;
       try {
@@ -86,13 +103,20 @@ export function WebsiteImport({
         );
       setResult(readImportResult(body));
     } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : "Website import could not finish. Please retry.",
-      );
+      if (timedOut) {
+        setError("Website capture took too long. Please retry the capture.");
+      } else if (!controller.signal.aborted) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Website import could not finish. Please retry.",
+        );
+      }
     } finally {
-      setBusy(false);
+      window.clearTimeout(timeout);
+      if (captureController.current === controller)
+        captureController.current = null;
+      if (!controller.signal.aborted || timedOut) setBusy(false);
     }
   }
   return (
