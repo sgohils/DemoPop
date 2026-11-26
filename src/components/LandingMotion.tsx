@@ -157,6 +157,7 @@ export function ProductStory() {
             id={`story-panel-${index}`}
             key={step.name}
             role="tabpanel"
+            tabIndex={0}
             aria-labelledby={`story-tab-${index}`}
             hidden={active !== index}
             className={styles.storyPanel}

@@ -710,6 +710,12 @@ test("workflow tabs support the keyboard and show the actual finished film", asy
     "aria-selected",
     "true",
   );
+  const panel = page.getByRole("tabpanel", { name: /Send it out/ });
+  await expect(panel).toHaveAttribute("tabindex", "0");
+  await page.keyboard.press("Tab");
+  await expect(panel).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(page.getByRole("tab", { name: /Send it out/ })).toBeFocused();
   const poster = page.getByRole("img", {
     name: "A frame from the real DemoPop launch film",
   });
