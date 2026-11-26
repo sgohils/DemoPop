@@ -750,6 +750,32 @@ test("live gallery stops playing when it leaves the viewport", async ({
   ).toHaveCount(0);
 });
 
+test("mobile gallery format controls stay easy to tap and expose their selection", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.locator("#styles").scrollIntoViewIfNeeded();
+  const group = page.getByRole("group", { name: "Sample video format" });
+  const portrait = group.getByRole("button", { name: "Portrait sample" });
+  const landscape = group.getByRole("button", { name: "Landscape sample" });
+
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect(landscape).toHaveAttribute("aria-pressed", "true");
+    for (const button of [portrait, landscape]) {
+      const bounds = await button.boundingBox();
+      expect(
+        bounds?.height,
+        `${width}px format control height`,
+      ).toBeGreaterThanOrEqual(44);
+    }
+    await portrait.click();
+    await expect(portrait).toHaveAttribute("aria-pressed", "true");
+    await expect(landscape).toHaveAttribute("aria-pressed", "false");
+    await landscape.click();
+  }
+});
+
 test("launch package demos load on demand, switch hooks with the keyboard, and pause offscreen", async ({
   page,
 }) => {
