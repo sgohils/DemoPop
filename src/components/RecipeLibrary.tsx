@@ -38,14 +38,21 @@ export function RecipeLibrary({
   const [recipes, setRecipes] = useState<Recipe[]>([]),
     [name, setName] = useState(project.name),
     [error, setError] = useState(""),
+    [loadError, setLoadError] = useState(""),
+    [loading, setLoading] = useState(false),
     [busy, setBusy] = useState<string | null>(null),
     [revision, setRevision] = useState(0),
     [notice, setNotice] = useState("");
   useEffect(() => {
     let live = true;
     setError("");
+    setLoadError("");
     setRecipes([]);
-    if (!scope) return;
+    if (!scope) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     const load = cloud
       ? fetch("/api/recipes", { cache: "no-store" }).then(async (response) => {
           const body = await response.json();
@@ -71,7 +78,10 @@ export function RecipeLibrary({
         if (live) setRecipes(records);
       })
       .catch((error) => {
-        if (live) setError(error.message);
+        if (live) setLoadError(error.message);
+      })
+      .finally(() => {
+        if (live) setLoading(false);
       });
     return () => {
       live = false;
@@ -169,12 +179,35 @@ export function RecipeLibrary({
           {error}
         </p>
       )}
+      {scope && loading && (
+        <p className="section-hint" role="status">
+          <Loader2 size={14} className="spin" aria-hidden="true" />
+          Loading saved recipes…
+        </p>
+      )}
+      {scope && loadError && (
+        <div role="alert">
+          <p className="error">Could not load saved recipes: {loadError}</p>
+          <button
+            type="button"
+            className="button secondary small"
+            onClick={() => setRevision((value) => value + 1)}
+          >
+            <RefreshCw size={14} /> Try again
+          </button>
+        </div>
+      )}
       {notice && (
         <p className="section-hint" role="status">
           {notice}
         </p>
       )}
-      <ul className="recipe-list">
+      {!loading && !loadError && scope && recipes.length === 0 && (
+        <p className="section-hint" role="status">
+          No recipes saved yet. Save this edit to reuse its story and media.
+        </p>
+      )}
+      <ul className="recipe-list" hidden={loading || !!loadError}>
         {recipes.map((recipe) => (
           <li key={recipe.id}>
             <div>
