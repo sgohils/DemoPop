@@ -1,14 +1,14 @@
 # Create from link
 
-Open `/create`, paste a public website URL, and choose **Generate video**. DemoPop captures desktop, a feature detail, and mobile, derives captions and branding from the page, builds a complete three-scene launch story, adds the original soundtrack, and renders an H.264 MP4. The default is a 30-second landscape video; optional controls support 15/30/60 seconds and landscape, vertical, or square. A bare domain is normalized to HTTPS.
+Open `/create`, paste a public website URL, and choose **Preview your video** on configured account installations. DemoPop captures desktop, a feature detail, and mobile, derives captions and branding from the page, and saves an editable three-scene launch story. Review the actual motion, edit the words, and choose **Export MP4** when ready. Previewing requires an account but no purchased package; exporting uses the existing paid project allowance. The default is a 30-second landscape video; optional controls support 15/30/60 seconds and landscape, vertical, or square. A bare domain is normalized to HTTPS. Unconfigured local development retains the one-step **Generate video** flow.
 
 The result includes native video playback and **Download MP4**. Account projects also include **Edit your video**, opening the generated scenes, captions, and private media in the existing studio. The staged website-import control in the studio remains available for people who want to review captures before building a story.
 
-The landing page introduces **Create from link** naturally in **How it works**, alongside screenshots and clips, and the studio and Projects workspace also link to this flow. The hero keeps a quiet **Create a video** action. The traditional editor remains directly accessible through **Try the studio** at the top right of the homepage and creation page. Both automatic and manual creation remain available. The moving landing banner and “Make a little noise” closing section are retained.
+The landing page introduces **Create from link** in **How it works**, alongside screenshots and clips, and the studio and Projects workspace also link to this flow. The hero offers **Create from a website**. The traditional editor remains directly accessible through **Try the studio**. The empty creation page shows a real, clearly labeled fictional sample export. See [the competitor comparison](DEMOPOP_COMPETITIVE_IMPROVEMENTS.md) for the preview, creative direction, and mobile editing improvements.
 
 ## Accounts and local preview
 
-With Supabase configured, authentication happens before website capture. Sign-in and email confirmation can return to `/create`; the browser preserves the entered URL and options for that return. Generated private inputs and the project are saved to the account, and a normal single-video job is queued through `enqueue_output_with_result`. The existing worker renders its immutable snapshot. The account's export allowance still applies. If queuing fails after saving, the UI offers the saved project for recovery.
+With Supabase configured, authentication happens before website capture. Sign-in and email confirmation can return to `/create`; the browser preserves the entered URL and options for that return. Preview requests save private inputs and the project without queuing any render. Inline edits persist in per-tab session storage, and media URLs are refreshed through the owned project endpoint. Export saves the edited project, then submits it through `/api/exports` and the existing paid/free queue policy. The existing worker renders its immutable snapshot. A payment prompt keeps the saved draft, and subsequent export uses the same captured media. Opening the full studio or starting a different website saves the current valid edits first.
 
 Without cloud configuration, development and the explicitly enabled local production preview render the complete MP4 in the web process. These local jobs are temporary: output is retained for 45 minutes, up to four jobs, with one active render at a time and a short submission cooldown. A process restart loses the local job list. Download the finished video to keep it. Public unconfigured production servers do not enable local rendering.
 
@@ -24,9 +24,9 @@ The local renderer uses the same Remotion composition and original soundtrack as
 
 ## Deployment
 
-Apply the existing migrations through `007_launch_workspace.sql`; no additional schema migration is introduced. Deploy the web application and existing queue worker together. The web server needs Chromium and its system dependencies; local preview rendering also needs the repository's renderer source, assets, Node subprocess support, and FFmpeg. `@remotion/bundler` and `@remotion/renderer` remain external Node packages in Next.js.
+Apply the existing migrations through `008_commercial.sql` for paid installations. The preview improvement introduces no further migration. Deploy the web application and existing queue worker together. The web server needs Chromium and its system dependencies; local preview rendering also needs the repository's renderer source, assets, Node subprocess support, and FFmpeg. `@remotion/bundler` and `@remotion/renderer` remain external Node packages in Next.js.
 
-The feature does not introduce billing, external generation charges, email sending by the agent, or a hosting deployment. Account/storage completion still requires a configured Supabase service and a running worker.
+See [commercial implementation](DEMOPOP_COMMERCIAL_IMPLEMENTATION.md) for billing configuration. No external generation provider is needed. No email sending or hosting deployment was performed. Account/storage completion requires a configured Supabase service; final MP4 export also requires a running worker.
 
 ## Verification
 

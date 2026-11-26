@@ -5,6 +5,9 @@ import { BrandMark } from "../components/BrandMark";
 import { LaunchScroll } from "../components/LaunchScroll";
 import { LaunchCampaign } from "../components/LaunchCampaign";
 import { LaunchWorkflow } from "../components/LaunchWorkflow";
+import { PlanCards } from "../components/PlanCards";
+import { stripeConfigured } from "../server/stripe";
+import { cloudConfigured } from "../server/supabase";
 import {
   LandingMotion,
   ProductStory,
@@ -23,7 +26,7 @@ const questions = [
   ],
   [
     "Do I need an account to try it?",
-    "You can use your own media, change the copy and styling, and preview without an account. Browser drafts and local recipes stay on your device. Sign in to save account projects, export, and share client review links.",
+    "Preview in the studio with your own media without an account. Website capture, saving, exports, and client review links require an account. Choose a project package or Studio plan for paid exports. Browser drafts and local recipes stay on your device.",
   ],
   [
     "Can I update a video without rebuilding it?",
@@ -57,6 +60,7 @@ export default function Home() {
           <a href="#studio" className={styles.navSection}>
             For client work
           </a>
+          <Link href="/pricing">Pricing</Link>
           <Link href="/projects" className={styles.projectLink}>
             Your projects
           </Link>
@@ -105,7 +109,7 @@ export default function Home() {
                 Give every channel a considered first impression.
               </p>
             </div>
-            <div data-reveal>
+            <div data-reveal="media">
               <LaunchCampaign />
             </div>
           </section>
@@ -187,7 +191,7 @@ export default function Home() {
           >
             <div className={styles.sectionTopline} data-reveal>
               <p className={styles.eyebrow}>
-                <span /> FOR FOUNDERS, MAKERS & CLIENT WORK
+                <span /> YOUR NEXT CLIENT STARTS FURTHER AHEAD
               </p>
               <span className={styles.indexLabel}>04 / KEEP YOUR MOMENTUM</span>
             </div>
@@ -198,13 +202,41 @@ export default function Home() {
                 <span>starts a little further ahead.</span>
               </h2>
               <p>
-                Bring the product. Keep your direction.
+                Reuse your brand and edit for the next client.
                 <br />
                 Close the loop with your client.
               </p>
             </div>
-            <div data-reveal>
+            <div data-reveal="media">
               <LaunchWorkflow />
+            </div>
+          </section>
+
+          <section
+            id="pricing"
+            className={styles.pricingSection}
+            aria-labelledby="pricing-heading"
+          >
+            <div className={styles.sectionTopline}>
+              <p className={styles.eyebrow}>
+                <span /> A DELIVERABLE WORTH REPEATING
+              </p>
+              <span className={styles.indexLabel}>05 / PRICING</span>
+            </div>
+            <div className={styles.campaignHeading}>
+              <h2 id="pricing-heading">
+                One launch.
+                <br />
+                <em>Or your next five.</em>
+              </h2>
+              <p>
+                A clear price for the whole client campaign.
+                <br />
+                Preview with your own media before you buy.
+              </p>
+            </div>
+            <div className={styles.pricingInner}>
+              <PlanCards available={cloudConfigured() && stripeConfigured()} />
             </div>
           </section>
 
@@ -280,6 +312,8 @@ export default function Home() {
           <p>For the work worth showing.</p>
           <div>
             <Link href="/projects">Your projects</Link>
+            <Link href="/pricing">Pricing</Link>
+            <Link href="/billing">Billing</Link>
             <Link href="/auth">
               Sign in <ArrowUpRight size={13} />
             </Link>

@@ -17,7 +17,10 @@ const media = async (name: string): Promise<Media> => ({
   width: 1440,
   height: 2000,
 });
-await mkdir("out", { recursive: true });
+const outputPath = path.resolve(
+  process.env.SAMPLE_OUTPUT || "out/demopop-sample.mp4",
+);
+await mkdir(path.dirname(outputPath), { recursive: true });
 let last = -1;
 try {
   await renderVideo(
@@ -27,7 +30,7 @@ try {
       after: await media("after"),
       logo: null,
     },
-    path.resolve(process.env.SAMPLE_OUTPUT || "out/demopop-sample.mp4"),
+    outputPath,
     (progress) => {
       const percent = Math.floor((progress * 100) / 10) * 10;
       if (percent !== last) {

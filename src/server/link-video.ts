@@ -8,7 +8,7 @@ import { makeCancelSignal } from "@remotion/renderer";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { buildLinkVideo, linkVideoRequestSchema } from "../shared/link-video";
-import type { Media, VideoProps } from "../shared/project";
+import { projectSchema, type Media, type VideoProps } from "../shared/project";
 import { safeStoragePath } from "./access";
 import { normalizeImage } from "./images";
 import { frameLinkMobileCapture } from "./link-video-framing";
@@ -21,6 +21,15 @@ import {
 } from "./link-video-jobs";
 import { adminClient, cloudConfigured, userClient } from "./supabase";
 import { captureWebsite, type WebsiteImport } from "./website-import";
+import {
+  billingSummary,
+  commercialQueue,
+  dailyRenderCap,
+  exportBillingError,
+  recordFunnel,
+} from "./billing";
+import { billingEnabled } from "./stripe";
+import { PAYMENT_REQUIRED } from "../shared/billing";
 
 type LinkVideoRequest = z.infer<typeof linkVideoRequestSchema>;
 type StoredImage = Awaited<ReturnType<typeof normalizeImage>> & { id: string };
@@ -269,8 +278,20 @@ export async function runLocalLinkVideo(
   }
 }
 
-export async function createCloudLinkVideo(request: LinkVideoRequest) {
-  const owner = await ownerIdentity();
+export async function createCloudLinkVideo(
+  request: LinkVideoRequest,
+  services = {
+    owner: ownerIdentity,
+    capture: captureWebsite,
+  },
+) {
+  const owner = await services.owner();
+  if (
+    !request.previewOnly &&
+    billingEnabled() &&
+    (await billingSummary(owner)).remaining < 1
+  )
+    throw new LinkVideoError(402, PAYMENT_REQUIRED);
   const admin = adminClient();
   const quota = await admin.rpc("consume_request_limit", {
     p_owner: owner,
@@ -289,18 +310,21 @@ export async function createCloudLinkVideo(request: LinkVideoRequest) {
       "Other websites are being prepared. Please try again shortly.",
     );
   state.cloudCaptures++;
+  await recordFunnel(owner, "creation_started");
   const registered: { id: string; path: string }[] = [];
   let projectId: string | undefined;
   try {
     let captured: WebsiteImport;
     try {
-      captured = await captureWebsite(request.url);
+      captured = await services.capture(request.url);
     } catch {
+      await recordFunnel(owner, "capture_failed");
       throw new LinkVideoError(
         400,
         "This website could not be opened. Try another public page.",
       );
     }
+    await recordFunnel(owner, "capture_succeeded");
     const images = await prepareImages(captured);
     const project = generatedProject(captured, request, images);
     for (const image of [
@@ -342,14 +366,31 @@ export async function createCloudLinkVideo(request: LinkVideoRequest) {
     if (saved.error || !saved.data)
       throw new Error("Website project could not be saved");
     projectId = saved.data.id;
-    const queued = await admin.rpc("enqueue_output_with_result", {
+    // A preview saves the real captured assets and editable project, but never
+    // queues a render or consumes purchased project access. The existing owned
+    // project endpoint supplies short-lived media URLs to its signed-in owner.
+    if (request.previewOnly)
+      return {
+        projectId,
+        mode: "cloud" as const,
+        status: "draft" as const,
+        progress: 0,
+      };
+    const queued = await admin.rpc(commercialQueue(), {
       p_owner: owner,
       p_project: projectId,
       p_settings: project,
-      p_daily_cap: Number(process.env.DAILY_EXPORT_CAP || 10),
+      p_daily_cap: dailyRenderCap(),
       p_kind: "video",
     });
-    if (queued.error)
+    if (queued.error) {
+      const billingError = exportBillingError(queued.error.message);
+      if (billingError)
+        throw new LinkVideoError(
+          billingError.status,
+          billingError.message,
+          projectId,
+        );
       throw new LinkVideoError(
         queued.error.message.includes("Daily") ? 429 : 503,
         queued.error.message.includes("Daily")
@@ -357,6 +398,7 @@ export async function createCloudLinkVideo(request: LinkVideoRequest) {
           : "Your draft was saved, but its video could not be queued. Open it in the editor to retry.",
         projectId,
       );
+    }
     const job = z.object({ id: z.uuid() }).safeParse(queued.data);
     if (!job.success)
       throw new LinkVideoError(
@@ -401,7 +443,7 @@ async function cloudJob(id: string) {
   const result = await admin
     .from("render_jobs")
     .select(
-      "id,owner_id,project_id,status,progress,error,output_path,output_kind",
+      "id,owner_id,project_id,status,progress,error,output_path,output_kind,snapshot",
     )
     .eq("id", id)
     .eq("owner_id", owner)
@@ -419,12 +461,15 @@ async function cloudJob(id: string) {
 export async function linkVideoStatus(req: NextRequest, id: string) {
   if (cloudConfigured()) {
     const { owner, job } = await cloudJob(id);
+    const snapshot = projectSchema.parse(job.snapshot);
     const result = {
       id,
       mode: "cloud" as const,
       status: job.status,
       progress: Math.max(0, Math.min(1, Number(job.progress) || 0)),
       projectId: job.project_id as string,
+      outputFormat: snapshot.format,
+      outputDuration: snapshot.story?.duration ?? 15,
       ...(job.status === "failed"
         ? {
             error:
@@ -491,6 +536,8 @@ export async function downloadLinkVideo(req: NextRequest, id: string) {
       );
     if (signed.error || !signed.data)
       throw new LinkVideoError(503, "The video is temporarily unavailable.");
+    if (req.method === "GET" && req.nextUrl.searchParams.get("inline") !== "1")
+      await recordFunnel(owner, "download_requested", job.project_id);
     return NextResponse.redirect(signed.data.signedUrl, {
       headers: {
         "Cache-Control": "private, no-store",

@@ -187,6 +187,9 @@ export function Projects({ configured }: { configured: boolean }) {
       <header className={`site-header ${styles.header}`}>
         <Brand />
         <nav aria-label="Workspace navigation">
+          <Link href="/billing" className="text-link">
+            Billing <ArrowUpRight size={15} />
+          </Link>
           <Link href="/editor/new" className="text-link">
             New video <Plus size={16} />
           </Link>
@@ -215,7 +218,7 @@ export function Projects({ configured }: { configured: boolean }) {
               Your projects<span className="heading-dot">.</span>
             </h1>
             <p>
-              Pick up where you left off. Or{" "}
+              Your client launches, ready for their next version. Or{" "}
               <Link href="/create" className="text-link">
                 create a video from a link <ArrowUpRight size={12} />
               </Link>

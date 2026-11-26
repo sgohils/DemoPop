@@ -5,6 +5,7 @@ import { adminClient, cloudConfigured } from "./supabase";
 import { projectSchema } from "../shared/project";
 import { safeStoragePath } from "./access";
 import { isSameOriginRequest } from "./request-origin";
+import { recordFunnel } from "./billing";
 
 export const reviewTokenHash = (token: string) =>
   createHash("sha256").update(token).digest("hex");
@@ -80,6 +81,7 @@ export async function publicReview(req: NextRequest, token: string) {
           },
           { status: result.error.message.includes("Too many") ? 429 : 409 },
         );
+      if (body.approve) await recordFunnel(review.owner_id, "review_approved");
       return NextResponse.json({ ok: true });
     }
     const path =

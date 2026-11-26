@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Package, Link2, Copy, Loader2, X } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Package, Link2, Copy, Loader2, X, Play } from "lucide-react";
 import { launchHooks } from "../shared/launch-kit";
 import type { ProjectInput } from "../shared/project";
 import type { HistoryJob } from "./ExportHistory";
@@ -27,6 +27,7 @@ export function LaunchDelivery({
   revision,
   onHooks,
   onExport,
+  onPreview,
 }: {
   project: ProjectInput;
   projectId: string | null;
@@ -35,22 +36,36 @@ export function LaunchDelivery({
   revision: string;
   onHooks: (hooks: string[]) => void;
   onExport: () => void;
+  onPreview: () => void;
 }) {
   const [jobs, setJobs] = useState<HistoryJob[]>([]),
     [jobId, setJobId] = useState(""),
     [agency, setAgency] = useState(project.client || project.name),
     [download, setDownload] = useState(true),
     [reviews, setReviews] = useState<Review[]>([]),
+    [reviewLoading, setReviewLoading] = useState(false),
+    [reviewLoadError, setReviewLoadError] = useState(""),
     [working, setWorking] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [reload, setReload] = useState(0),
     [reviewOpen, setReviewOpen] = useState(false);
+  const reviewScope = `${projectId ?? ""}:${authorized}:${reviewOpen}`;
+  const activeReviewScope = useRef(reviewScope);
+  useLayoutEffect(() => {
+    activeReviewScope.current = reviewScope;
+    setWorking(false);
+    setError("");
+    setNotice("");
+  }, [reviewScope]);
   useEffect(() => {
     let live = true;
     setReviews([]);
     setJobs([]);
+    setJobId("");
+    setReviewLoadError("");
     if (!authorized || !projectId || !reviewOpen) return;
+    setReviewLoading(true);
     void Promise.all(
       [
         fetch(`/api/projects/${projectId}/exports`, { cache: "no-store" }),
@@ -63,17 +78,24 @@ export function LaunchDelivery({
     )
       .then(([exports, links]) => {
         if (live) {
-          setJobs(
-            exports.jobs.filter(
-              (job: HistoryJob) =>
-                job.status === "completed" && !job.output_expired_at,
-            ),
+          const availableJobs = exports.jobs.filter(
+            (job: HistoryJob) =>
+              job.status === "completed" && !job.output_expired_at,
+          );
+          setJobs(availableJobs);
+          setJobId((current) =>
+            availableJobs.some((job: HistoryJob) => job.id === current)
+              ? current
+              : (availableJobs[0]?.id ?? ""),
           );
           setReviews(links.reviews);
         }
       })
       .catch((error) => {
-        if (live) setError(error.message);
+        if (live) setReviewLoadError(error.message);
+      })
+      .finally(() => {
+        if (live) setReviewLoading(false);
       });
     return () => {
       live = false;
@@ -81,6 +103,7 @@ export function LaunchDelivery({
   }, [authorized, projectId, revision, reload, reviewOpen]);
   const hooks = launchHooks(project);
   async function createLink() {
+    const requestScope = reviewScope;
     setWorking(true);
     setError("");
     setNotice("");
@@ -89,21 +112,25 @@ export function LaunchDelivery({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jobId: jobId || jobs[0]?.id,
+          jobId: jobs.some((job) => job.id === jobId)
+            ? jobId
+            : jobs[0]?.id,
           agencyName: agency,
           allowDownload: download,
         }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
+      if (activeReviewScope.current !== requestScope) return;
       setReload((value) => value + 1);
       setNotice(
         "Review link created. Copy it below to share with your client.",
       );
     } catch (error) {
-      setError((error as Error).message);
+      if (activeReviewScope.current === requestScope)
+        setError((error as Error).message);
     } finally {
-      setWorking(false);
+      if (activeReviewScope.current === requestScope) setWorking(false);
     }
   }
   return (
@@ -125,7 +152,8 @@ export function LaunchDelivery({
             Package hook {index + 1}
             <small>{hook.length}/70</small>
           </span>
-          <input
+          <textarea
+            rows={2}
             maxLength={70}
             value={hook}
             onChange={(event) =>
@@ -138,6 +166,13 @@ export function LaunchDelivery({
           />
         </label>
       ))}
+      <button
+        type="button"
+        className="button secondary small package-preview-action"
+        onClick={onPreview}
+      >
+        <Play size={14} /> Preview 9 versions
+      </button>
       <button
         className="button primary small"
         disabled={!authorized || busy || hooks.some((hook) => !hook.trim())}
@@ -218,11 +253,6 @@ export function LaunchDelivery({
           )}{" "}
           Create review link
         </button>
-        {!jobs.length && (
-          <p className="section-hint">
-            Finish an export to create its review link.
-          </p>
-        )}
         {error && (
           <p className="error" role="alert">
             {error}
@@ -234,7 +264,39 @@ export function LaunchDelivery({
           </p>
         )}
         <div className="review-links">
-          {reviews
+          {reviewLoading ? (
+            <p className="section-hint" role="status">
+              <Loader2 size={14} className="spin" aria-hidden="true" />
+              Loading completed exports and review links…
+            </p>
+          ) : reviewLoadError ? (
+            <div role="alert">
+              <p className="error">
+                Could not load review links: {reviewLoadError}
+              </p>
+              <button
+                type="button"
+                className="button secondary small"
+                onClick={() => setReload((value) => value + 1)}
+              >
+                <Link2 size={14} /> Try again
+              </button>
+            </div>
+          ) : !authorized || !projectId ? (
+            <p className="section-hint" role="status">
+              Sign in and save this project to manage client review links.
+            </p>
+          ) : jobs.length === 0 ? (
+            <p className="section-hint" role="status">
+              Complete an export before creating a client review link.
+            </p>
+          ) : reviews.every((review) => review.revoked_at) ? (
+            <p className="section-hint" role="status">
+              No active review links yet. Create one for a completed export
+              above.
+            </p>
+          ) : null}
+          {!reviewLoading && !reviewLoadError && reviews
             .filter((review) => !review.revoked_at)
             .map((review) => (
               <article key={review.id}>
@@ -278,6 +340,7 @@ export function LaunchDelivery({
                     className="text-link"
                     disabled={working}
                     onClick={async () => {
+                      const requestScope = reviewScope;
                       setWorking(true);
                       setError("");
                       try {
@@ -287,12 +350,15 @@ export function LaunchDelivery({
                         );
                         const body = await response.json();
                         if (!response.ok) throw new Error(body.error);
+                        if (activeReviewScope.current !== requestScope) return;
                         setReload((value) => value + 1);
                         setNotice("Review link revoked.");
                       } catch (error) {
-                        setError((error as Error).message);
+                        if (activeReviewScope.current === requestScope)
+                          setError((error as Error).message);
                       } finally {
-                        setWorking(false);
+                        if (activeReviewScope.current === requestScope)
+                          setWorking(false);
                       }
                     }}
                   >

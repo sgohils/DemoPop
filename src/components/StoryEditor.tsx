@@ -15,11 +15,13 @@ import {
   type Media,
   type ProjectInput,
   type Story,
+  type StoryScene,
 } from "../shared/project";
 import {
   starterStory,
   storyTimeline,
   storyViewport,
+  storyCrop,
 } from "../shared/launch-kit";
 
 export function StoryEditor({
@@ -38,17 +40,28 @@ export function StoryEditor({
   onSeek: (frame: number) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [announcement, setAnnouncement] = useState("");
   const story = project.story;
   const timeline = storyTimeline(project);
-  const edit = (id: string, changes: Partial<Story["scenes"][number]>) => {
+  const edit = (
+    id: string,
+    changes: Partial<StoryScene> | ((scene: StoryScene) => Partial<StoryScene>),
+  ) => {
     if (!story) return;
     onChange((current) =>
       current
         ? {
             ...current,
             scenes: current.scenes.map((scene) =>
-              scene.id === id ? { ...scene, ...changes } : scene,
+              scene.id === id
+                ? {
+                    ...scene,
+                    ...(typeof changes === "function"
+                      ? changes(scene)
+                      : changes),
+                  }
+                : scene,
             ),
           }
         : null,
@@ -68,8 +81,31 @@ export function StoryEditor({
     }
   };
   const viewport = storyViewport(project.format);
+  const formatName =
+    project.format === "vertical"
+      ? "Vertical"
+      : project.format === "landscape"
+        ? "Landscape"
+        : "Square";
   return (
     <div className="story-builder">
+      <span
+        role="status"
+        aria-live="polite"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {announcement}
+      </span>
       <div className="kit-segment" role="group" aria-label="Story structure">
         <button
           type="button"
@@ -123,13 +159,9 @@ export function StoryEditor({
           <div className="story-cards">
             {story.scenes.map((scene, index) => {
               const source = media[scene.asset] ?? sampleAsset(scene.asset);
+              const crop = storyCrop(scene, project.format);
               const geometry = source
-                ? coverGeometry(
-                    source,
-                    scene.crop,
-                    viewport.width,
-                    viewport.height,
-                  )
+                ? coverGeometry(source, crop, viewport.width, viewport.height)
                 : null;
               const seek = () => onSeek(timeline.beats[index].preview);
               return (
@@ -163,6 +195,9 @@ export function StoryEditor({
                             scenes[index - 1],
                           ];
                           onChange({ ...story, scenes });
+                          setAnnouncement(
+                            `Scene ${index + 1} moved to position ${index} of ${scenes.length}.`,
+                          );
                         }}
                       >
                         <ArrowUp size={14} />
@@ -178,6 +213,9 @@ export function StoryEditor({
                             scenes[index + 1],
                           ];
                           onChange({ ...story, scenes });
+                          setAnnouncement(
+                            `Scene ${index + 1} moved to position ${index + 2} of ${scenes.length}.`,
+                          );
                         }}
                       >
                         <ArrowDown size={14} />
@@ -347,6 +385,13 @@ export function StoryEditor({
                     <summary>
                       Framing{source?.kind === "video" ? " & clip start" : ""}
                     </summary>
+                    <p className="section-hint">
+                      {formatName} framing
+                      {scene.formatCrops?.[project.format]
+                        ? " · custom for this format."
+                        : " · using shared framing."}{" "}
+                      Adjustments here change only the {project.format} video.
+                    </p>
                     <div className="crop-controls">
                       {(["x", "y", "zoom"] as const).map((axis) => (
                         <label key={axis}>
@@ -356,23 +401,27 @@ export function StoryEditor({
                               : axis === "y"
                                 ? "Vertical"
                                 : "Zoom"}
-                            <small>{Math.round(scene.crop[axis] * 100)}%</small>
+                            <small>{Math.round(crop[axis] * 100)}%</small>
                           </span>
                           <input
                             type="range"
                             min={axis === "zoom" ? 1 : 0}
                             max={axis === "zoom" ? 2 : 1}
                             step={0.01}
-                            value={scene.crop[axis]}
+                            value={crop[axis]}
                             aria-label={`Scene ${index + 1} ${axis}`}
-                            onChange={(event) =>
-                              edit(scene.id, {
-                                crop: {
-                                  ...scene.crop,
-                                  [axis]: Number(event.target.value),
+                            onChange={(event) => {
+                              const value = Number(event.target.value);
+                              edit(scene.id, (current) => ({
+                                formatCrops: {
+                                  ...current.formatCrops,
+                                  [project.format]: {
+                                    ...storyCrop(current, project.format),
+                                    [axis]: value,
+                                  },
                                 },
-                              })
-                            }
+                              }));
+                            }}
                           />
                         </label>
                       ))}
@@ -397,6 +446,40 @@ export function StoryEditor({
                           />
                         </label>
                       )}
+                    </div>
+                    <div className="kit-actions">
+                      <button
+                        type="button"
+                        className="text-link"
+                        aria-label={`Reset scene ${index + 1} ${project.format} framing`}
+                        disabled={!scene.formatCrops?.[project.format]}
+                        onClick={() =>
+                          edit(scene.id, (current) => {
+                            const formatCrops = { ...current.formatCrops };
+                            delete formatCrops[project.format];
+                            return {
+                              formatCrops: Object.keys(formatCrops).length
+                                ? formatCrops
+                                : undefined,
+                            };
+                          })
+                        }
+                      >
+                        Use shared framing
+                      </button>
+                      <button
+                        type="button"
+                        className="text-link"
+                        aria-label={`Apply scene ${index + 1} framing to every format`}
+                        onClick={() =>
+                          edit(scene.id, (current) => ({
+                            crop: { ...storyCrop(current, project.format) },
+                            formatCrops: undefined,
+                          }))
+                        }
+                      >
+                        Apply framing to every format
+                      </button>
                     </div>
                   </details>
                 </fieldset>

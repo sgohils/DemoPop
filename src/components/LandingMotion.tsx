@@ -39,7 +39,10 @@ export function LandingMotion({ children }: { children: ReactNode }) {
       const nodes = element.querySelectorAll<HTMLElement>(
         "[data-reveal], [data-animate]",
       );
-      if (reduced.matches || !("IntersectionObserver" in window)) {
+      if (
+        reduced.matches ||
+        typeof window.IntersectionObserver !== "function"
+      ) {
         nodes.forEach((node) => {
           node.dataset.seen = "true";
           node.dataset.active = "false";
@@ -54,7 +57,7 @@ export function LandingMotion({ children }: { children: ReactNode }) {
             node.dataset.active = String(entry.isIntersecting);
           }
         },
-        { threshold: 0.12, rootMargin: "0px 0px -24px 0px" },
+        { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
       );
       nodes.forEach((node) => observer?.observe(node));
     };
@@ -100,7 +103,7 @@ export function ProductStory() {
   const [active, setActive] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   return (
-    <div className={styles.story} data-reveal data-animate>
+    <div className={styles.story} data-reveal="media" data-animate>
       <div className={styles.storyControls}>
         <div
           className={styles.storyTabs}
@@ -157,6 +160,7 @@ export function ProductStory() {
             id={`story-panel-${index}`}
             key={step.name}
             role="tabpanel"
+            tabIndex={0}
             aria-labelledby={`story-tab-${index}`}
             hidden={active !== index}
             className={styles.storyPanel}
@@ -270,6 +274,10 @@ export function LandingGallery() {
   useEffect(() => {
     const element = root.current;
     if (!element) return;
+    if (typeof IntersectionObserver !== "function") {
+      setNear(true);
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {

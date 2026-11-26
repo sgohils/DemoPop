@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+﻿import { test, expect } from "@playwright/test";
 
 const id = "44444444-4444-4444-8444-444444444444";
 const projectId = "33333333-3333-4333-8333-333333333333";
@@ -54,13 +54,13 @@ test("sign in returns to the website and options the user already entered", asyn
     .getByRole("combobox", { name: "Video length", exact: true })
     .selectOption("60");
   await page
-    .getByRole("button", { name: "Generate video", exact: true })
+    .getByRole("button", { name: "Preview your video", exact: true })
     .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "Sign in",
   );
   await page
-    .getByRole("link", { name: "Sign in to generate", exact: true })
+    .getByRole("link", { name: "Sign in to preview", exact: true })
     .click();
   await expect(page).toHaveURL(/\/auth\?next=%2Fcreate$/);
   await page
@@ -80,7 +80,7 @@ test("sign in returns to the website and options the user already entered", asyn
     page.getByRole("combobox", { name: "Video length", exact: true }),
   ).toHaveValue("60");
   await page
-    .getByRole("button", { name: "Generate video", exact: true })
+    .getByRole("button", { name: "Preview your video", exact: true })
     .click();
   await expect(
     page.getByText("YOUR VIDEO IS READY", { exact: true }),
@@ -100,6 +100,7 @@ test("sign in returns to the website and options the user already entered", asyn
       url: "https://example.com/new-product",
       format: "vertical",
       duration: 60,
+      previewOnly: true,
     }),
   );
 });
@@ -112,7 +113,7 @@ test("a saved website draft remains accessible if the render queue cannot accept
       status: 429,
       json: {
         error:
-          "Your project was saved, but today’s export allowance has been used.",
+          "Your project was saved, but today's export allowance has been used.",
         projectId,
       },
     }),
@@ -122,7 +123,7 @@ test("a saved website draft remains accessible if the render queue cannot accept
     .getByLabel("Your website link", { exact: true })
     .fill("example.com");
   await page
-    .getByRole("button", { name: "Generate video", exact: true })
+    .getByRole("button", { name: "Preview your video", exact: true })
     .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
     "Your project was saved",

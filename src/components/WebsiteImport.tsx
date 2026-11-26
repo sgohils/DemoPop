@@ -1,7 +1,48 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Globe, Loader2, ArrowRight, X } from "lucide-react";
 import type { WebsiteImport as ImportResult } from "../server/website-import";
+
+function readImportResult(value: unknown): ImportResult {
+  if (!value || typeof value !== "object")
+    throw new Error(
+      "The website capture returned an unreadable result. Please retry.",
+    );
+
+  const result = value as Partial<ImportResult>;
+  const validCaptures =
+    Array.isArray(result.captures) &&
+    result.captures.length >= 3 &&
+    result.captures.length <= 6 &&
+    result.captures.every(
+      (capture) =>
+        capture &&
+        typeof capture.name === "string" &&
+        typeof capture.caption === "string" &&
+        typeof capture.image === "string" &&
+        /^data:image\/png;base64,[a-z\d+/]+=*$/i.test(capture.image),
+    );
+
+  if (
+    typeof result.url !== "string" ||
+    typeof result.name !== "string" ||
+    typeof result.opening !== "string" ||
+    typeof result.color !== "string" ||
+    !/^#[\da-f]{6}$/i.test(result.color) ||
+    (result.font !== "dm-sans" && result.font !== "manrope") ||
+    typeof result.cta !== "string" ||
+    (result.description !== undefined &&
+      typeof result.description !== "string") ||
+    (result.sections !== undefined && !Array.isArray(result.sections)) ||
+    !validCaptures ||
+    (result.logo !== null && typeof result.logo !== "string")
+  )
+    throw new Error(
+      "The website capture returned incomplete screenshots. Please retry the capture.",
+    );
+
+  return result as ImportResult;
+}
 
 export function WebsiteImport({
   onApply,
@@ -16,24 +57,66 @@ export function WebsiteImport({
     [applying, setApplying] = useState(false),
     [error, setError] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+  const captureController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      captureController.current?.abort();
+    },
+    [],
+  );
+
   async function capture() {
     setBusy(true);
     setError("");
     setResult(null);
+    const controller = new AbortController();
+    captureController.current = controller;
+    let timedOut = false;
+    const timeout = window.setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, 45_000);
     try {
       const response = await fetch("/api/website-import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim() }),
+        signal: controller.signal,
       });
-      const body = await response.json();
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        throw new Error(
+          "The website capture returned an unreadable response. Please retry the capture.",
+        );
+      }
       if (!response.ok)
-        throw new Error(body.error || "Website import could not finish.");
-      setResult(body);
+        throw new Error(
+          body &&
+            typeof body === "object" &&
+            "error" in body &&
+            typeof body.error === "string"
+            ? body.error
+            : "Website import could not finish.",
+        );
+      setResult(readImportResult(body));
     } catch (error) {
-      setError((error as Error).message);
+      if (timedOut) {
+        setError("Website capture took too long. Please retry the capture.");
+      } else if (!controller.signal.aborted) {
+        setError(
+          error instanceof Error
+            ? error.message
+            : "Website import could not finish. Please retry.",
+        );
+      }
     } finally {
-      setBusy(false);
+      window.clearTimeout(timeout);
+      if (captureController.current === controller)
+        captureController.current = null;
+      if (!controller.signal.aborted || timedOut) setBusy(false);
     }
   }
   return (
@@ -177,7 +260,11 @@ export function WebsiteImport({
                       setResult(null);
                       setOpen(false);
                     } catch (error) {
-                      setError((error as Error).message);
+                      setError(
+                        error instanceof Error
+                          ? error.message
+                          : "This draft could not be applied. Please retry.",
+                      );
                     } finally {
                       setApplying(false);
                     }

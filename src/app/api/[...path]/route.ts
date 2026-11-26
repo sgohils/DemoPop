@@ -20,6 +20,14 @@ import { prepareClip } from "../../../server/clips";
 import { publicReview, reviewTokenHash } from "../../../server/review-api";
 import { owned, safeStoragePath } from "../../../server/access";
 import {
+  commercialQueue,
+  dailyRenderCap,
+  exportBillingError,
+  recordFunnel,
+} from "../../../server/billing";
+import { BillingError } from "../../../server/stripe";
+import { safeAuthNext } from "../../../shared/auth-next";
+import {
   isSameOriginRequest,
   requestOrigin,
 } from "../../../server/request-origin";
@@ -112,7 +120,11 @@ async function handle(
         .object({
           email: z.email().max(254),
           password: z.string().min(8).max(128),
-          next: z.literal("/create").optional(),
+          next: z
+            .string()
+            .max(500)
+            .refine((value) => value === safeAuthNext(value))
+            .optional(),
         })
         .strict()
         .parse(await req.json());
@@ -122,7 +134,7 @@ async function handle(
               email: body.email,
               password: body.password,
               options: {
-                emailRedirectTo: `${requestOrigin(req)}/auth/confirm${body.next === "/create" ? "?next=%2Fcreate" : ""}`,
+                emailRedirectTo: `${requestOrigin(req)}/auth/confirm${body.next ? `?next=${encodeURIComponent(safeAuthNext(body.next))}` : ""}`,
               },
             })
           : id === "login"
@@ -140,8 +152,8 @@ async function handle(
           ? "Signed in."
           : "Check your email to confirm your account, then sign in.",
       });
-      if (id === "signup" && !result.data.session && body.next === "/create")
-        response.cookies.set("demopop-auth-next", "/create", {
+      if (id === "signup" && !result.data.session && body.next)
+        response.cookies.set("demopop-auth-next", safeAuthNext(body.next), {
           httpOnly: true,
           sameSite: "lax",
           secure: req.nextUrl.protocol === "https:",
@@ -498,6 +510,7 @@ async function handle(
             .select("id")
             .single();
           check(result.error);
+          await recordFunnel(owner, "review_created", projectId);
           return NextResponse.json({
             id: result.data!.id,
             url: `${requestOrigin(req)}/review/${token}`,
@@ -672,14 +685,16 @@ async function handle(
         .maybeSingle();
       check(row.error);
       owned(row.data, owner);
-      const result = await admin.rpc("enqueue_output_with_result", {
+      const result = await admin.rpc(commercialQueue(), {
         p_owner: owner,
         p_project: body.projectId,
         p_settings: body.project,
-        p_daily_cap: Number(process.env.DAILY_EXPORT_CAP || 10),
+        p_daily_cap: dailyRenderCap(),
         p_kind: body.outputKind,
       });
       if (result.error) {
+        const billingError = exportBillingError(result.error.message);
+        if (billingError) throw billingError;
         if (result.error.message.includes("Daily"))
           throw new HttpError(
             429,
@@ -725,7 +740,7 @@ async function handle(
         const retried = await admin.rpc("retry_render", {
           p_owner: owner,
           p_job: jobId,
-          p_daily_cap: Number(process.env.DAILY_EXPORT_CAP || 10),
+          p_daily_cap: dailyRenderCap(),
         });
         if (retried.error)
           throw new HttpError(
@@ -760,12 +775,18 @@ async function handle(
                 : "demopop-redesign.mp4",
           });
         check(signed.error);
+        await recordFunnel(owner, "download_requested", row.project_id);
         return NextResponse.json({ url: signed.data!.signedUrl });
       }
       if (req.method === "GET") return NextResponse.json({ job });
     }
     throw new HttpError(404, "Not found.");
   } catch (e) {
+    if (e instanceof BillingError)
+      return NextResponse.json(
+        { error: e.message, pricingUrl: "/pricing" },
+        { status: e.status },
+      );
     if (e instanceof z.ZodError)
       return NextResponse.json(
         {

@@ -46,7 +46,7 @@ test("canceling browser Back keeps edits and continuing Back discards them", asy
   await decideNavigation(page, () => page.goBack(), true);
   await expect(page).toHaveURL(/\/$/);
   await expect(
-    page.getByRole("heading", { name: /You built it/ }),
+    page.getByRole("heading", { name: /Turn client websites/ }),
   ).toBeVisible();
 });
 

@@ -24,6 +24,7 @@ export function Preview({
   scenes = false,
   focusFrame,
   pauseWhenOffscreen = false,
+  onReady,
 }: {
   input: VideoProps;
   compact?: boolean;
@@ -31,6 +32,7 @@ export function Preview({
   scenes?: boolean;
   focusFrame?: { frame: number; request: number };
   pauseWhenOffscreen?: boolean;
+  onReady?: () => void;
 }) {
   const ref = useRef<PlayerRef>(null);
   const surface = useRef<HTMLDivElement>(null);
@@ -40,6 +42,13 @@ export function Preview({
   const poster = useRef(true);
   const [playing, setPlaying] = useState(false);
   const [ready, setReady] = useState(false);
+  const notifiedReady = useRef(false);
+  useEffect(() => {
+    if (ready && !notifiedReady.current) {
+      notifiedReady.current = true;
+      onReady?.();
+    }
+  }, [ready, onReady]);
   const [error, setError] = useState("");
   const [retryCount, setRetryCount] = useState(0);
   const dimensions = videoSettings(input.project);
@@ -52,16 +61,19 @@ export function Preview({
   useEffect(() => {
     const element = surface.current;
     if (!pauseWhenOffscreen || !element) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) ref.current?.pause();
-    });
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) ref.current?.pause();
+          })
+        : undefined;
     const visibility = () => {
       if (document.hidden) ref.current?.pause();
     };
-    observer.observe(element);
+    observer?.observe(element);
     document.addEventListener("visibilitychange", visibility);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [pauseWhenOffscreen]);
@@ -171,7 +183,10 @@ export function Preview({
         }
       }}
     >
-      <div className="video-shell">
+      <div
+        className="video-shell"
+        style={{ aspectRatio: `${dimensions.width} / ${dimensions.height}` }}
+      >
         <Player
           ref={ref}
           component={Showcase}

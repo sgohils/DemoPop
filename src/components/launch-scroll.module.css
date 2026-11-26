@@ -1,19 +1,28 @@
 .hero {
   position: relative;
-  height: 270svh;
+  height: 360svh;
   background: #08090d;
   color: #f6f6f8;
   isolation: isolate;
 }
 
 .stage {
-  --film-scale: 0.59;
-  --film-x: 22vw;
-  --film-y: 12px;
-  --film-rotate: -5deg;
+  --film-scale: 0.68;
+  --film-x: 0px;
+  --film-y: 130px;
+  --film-rotate: 0deg;
   --copy-opacity: 1;
   --copy-y: 0px;
   --ambient: 0.2;
+  --immersion: 0;
+  --film-tilt: 8deg;
+  --film-roll: -1.2deg;
+  --film-radius: 12px;
+  --frame-opacity: 1;
+  --backdrop-y: 30px;
+  --orbit-turn: -18deg;
+  --echo-y: 70px;
+  --ambient-x: -4%;
   position: sticky;
   top: 0;
   height: 100svh;
@@ -22,13 +31,74 @@
   contain: layout paint;
 }
 
+.sceneBackdrop {
+  position: absolute;
+  inset: -12%;
+  background:
+    linear-gradient(180deg, #08090d80, #08090de6),
+    url("/films/demopop-launch-poster.webp") center / cover;
+  filter: blur(24px) saturate(1.4);
+  opacity: calc(0.12 + var(--immersion) * 0.32);
+  transform: translate3d(0, var(--backdrop-y), 0) scale(1.15);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.orbit {
+  position: absolute;
+  inset: 3% -16%;
+  transform: rotate(var(--orbit-turn));
+  will-change: transform;
+  pointer-events: none;
+  opacity: calc(0.5 - var(--immersion) * 0.2);
+}
+.orbit span {
+  position: absolute;
+  inset: 12%;
+  border: 1px solid #9aaeff12;
+  border-radius: 50%;
+}
+.orbit span:nth-child(2) {
+  inset: 20% 4%;
+  border-color: #b8caff0a;
+}
+.orbit span:nth-child(3) {
+  inset: 2% 24%;
+  border-color: #dfff860c;
+}
+.chapterEcho {
+  position: absolute;
+  right: -1%;
+  bottom: 8%;
+  color: #b5c5ff03;
+  -webkit-text-stroke: 1px #c6d3ff14;
+  font-size: clamp(240px, 38vw, 680px);
+  line-height: 0.85;
+  font-weight: 550;
+  letter-spacing: -0.09em;
+  transform: translate3d(
+    0,
+    calc(var(--echo-y) + var(--chapter-shift) * 24px),
+    0
+  );
+  opacity: calc(
+    var(--chapter-opacity, 0) * max(0, (var(--chapter-weight) - 0.5) * 2)
+  );
+  will-change: transform, opacity;
+  pointer-events: none;
+  user-select: none;
+}
+
 .ambient {
   position: absolute;
-  inset: 0;
+  inset: -12%;
   pointer-events: none;
   opacity: var(--ambient);
-  will-change: opacity;
-  background: radial-gradient(ellipse at 50% 61%, #536bff24, transparent 55%);
+  will-change: transform, opacity;
+  transform: translate3d(var(--ambient-x), 0, 0);
+  background:
+    radial-gradient(ellipse at 26% 44%, #536bff34, transparent 48%),
+    radial-gradient(ellipse at 82% 67%, #a7c76e15, transparent 45%);
 }
 
 .coordinates {
@@ -42,17 +112,20 @@
   font-weight: 650;
   letter-spacing: 0.13em;
   color: #6b6d79;
+  opacity: calc(1 - var(--immersion));
+  pointer-events: none;
 }
 
 .intro {
   position: absolute;
   z-index: 2;
-  left: 5.3%;
-  top: 50%;
-  width: 47%;
-  max-width: 700px;
-  transform: translateY(calc(-50% + var(--copy-y)));
+  left: 50%;
+  top: 132px;
+  width: min(90%, 1400px);
+  transform: translate3d(-50%, var(--copy-y), 0);
+  text-align: center;
   opacity: var(--copy-opacity);
+  visibility: var(--copy-visibility, visible);
   pointer-events: none;
   will-change: transform, opacity;
 }
@@ -64,8 +137,9 @@
 .eyebrow {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
-  margin: 0 0 26px;
+  margin: 0 0 16px;
   color: #b8bbc8;
   font-size: 9px;
   font-weight: 650;
@@ -83,7 +157,7 @@
 
 .intro h1 {
   margin: 0;
-  font-size: clamp(62px, 6.4vw, 104px);
+  font-size: clamp(44px, 5.1vw, 74px);
   line-height: 0.98;
   letter-spacing: -0.067em;
   font-weight: 650;
@@ -93,9 +167,16 @@
   color: #a8adbf;
 }
 
+.introFooter {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 28px;
+  margin-top: 22px;
+}
 .description {
-  max-width: 390px;
-  margin: 28px 0 0;
+  max-width: 420px;
+  margin: 0;
   color: #a5aaba;
   font-size: clamp(14px, 1.1vw, 17px);
   line-height: 1.65;
@@ -106,7 +187,7 @@
   display: flex;
   align-items: center;
   gap: 20px;
-  margin-top: 32px;
+  margin-top: 0;
 }
 
 .create {
@@ -154,7 +235,7 @@
   position: absolute;
   left: 50%;
   bottom: 78px;
-  transform: translateX(-50%);
+  transform: translate3d(-50%, calc(var(--echo-y) * -0.4), 0);
   color: #ffffff03;
   -webkit-text-stroke: 1px #ffffff0b;
   font-size: clamp(100px, 21vw, 380px);
@@ -176,12 +257,51 @@
 }
 
 .mobileChapter {
-  display: none;
+  position: absolute;
+  z-index: 2;
+  top: 108px;
+  left: 4%;
+  display: grid;
+  width: 92%;
+  overflow: clip;
+  opacity: var(--chapter-opacity, 0);
+  transform: translateY(var(--chapter-y, 20px));
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+.chapterPanel {
+  grid-area: 1 / 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  opacity: var(--chapter-weight);
+  transform: translate3d(0, calc(var(--chapter-shift) * 110%), 0);
+  will-change: transform, opacity;
+}
+.mobileChapterKicker {
+  display: block;
+  color: #dfff86;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.mobileChapter p {
+  margin: 0;
+  color: #f3f4f8;
+  font-size: clamp(28px, 2.6vw, 40px);
+  font-weight: 550;
+  line-height: 1.03;
+  letter-spacing: -0.055em;
+  white-space: normal;
 }
 
 .filmPosition {
   position: absolute;
-  width: min(86%, 1390px);
+  z-index: 1;
+  width: min(96%, 1800px);
   left: 50%;
   top: 49%;
   transform: translate(-50%, -50%) translate3d(var(--film-x), var(--film-y), 0)
@@ -196,8 +316,11 @@
   overflow: hidden;
   background: #0b0d15;
   border: 1px solid #ffffff24;
-  border-radius: 11px;
-  transform: translateZ(0);
+  border-radius: var(--film-radius);
+  transform: perspective(1800px) rotateX(var(--film-tilt))
+    rotateZ(var(--film-roll));
+  box-shadow: 0 28px 90px #0007;
+  will-change: transform;
 }
 
 .scrubVideo {
@@ -221,6 +344,7 @@
   letter-spacing: 0.1em;
   background: linear-gradient(#07080acc, transparent);
   pointer-events: none;
+  opacity: var(--frame-opacity);
 }
 
 .frameTop > span:first-child {
@@ -249,6 +373,69 @@
   border-radius: 50%;
   color: #ccd0df;
   pointer-events: none;
+  opacity: var(--frame-opacity);
+}
+
+.chapterRail {
+  position: absolute;
+  z-index: 3;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  gap: 12px;
+}
+.stage .chapterRail button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 42px;
+  padding: 0;
+  color: #858c9f;
+  font:
+    500 9px "DM Sans",
+    sans-serif;
+  cursor: pointer;
+}
+.chapterRail i {
+  position: absolute;
+  right: -4px;
+  width: 2px;
+  height: 12px;
+  background: #8490a43b;
+  transition:
+    height 200ms ease,
+    background 200ms ease;
+}
+.stage .chapterRail button[aria-current="step"] {
+  color: #dfff86;
+}
+.chapterRail [aria-current="step"] i {
+  height: 28px;
+  background: #dfff86;
+}
+.railName {
+  position: absolute;
+  left: 46px;
+  padding: 9px 12px;
+  white-space: nowrap;
+  background: #10141ff0;
+  border: 1px solid #ffffff18;
+  border-radius: 4px;
+  color: #ecedf3;
+  opacity: 0;
+  transform: translateX(-5px);
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+  pointer-events: none;
+}
+.chapterRail button:hover .railName,
+.chapterRail button:focus-visible .railName {
+  opacity: 1;
+  transform: translateX(0);
 }
 
 .frameCorner svg {
@@ -260,6 +447,7 @@
 
 .bottomBar {
   position: absolute;
+  z-index: 3;
   left: 4%;
   right: 4%;
   bottom: 32px;
@@ -271,9 +459,26 @@
 }
 
 .chapter {
+  display: grid;
+  min-width: 0;
+  overflow: clip;
+}
+.chapterSummary {
+  grid-area: 1 / 1;
   display: flex;
   align-items: center;
   gap: 13px;
+  opacity: var(--chapter-weight);
+  transform: translate3d(0, calc(var(--chapter-shift) * 110%), 0);
+  will-change: transform, opacity;
+}
+.chapterDescription {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .chapterNumber {
@@ -287,7 +492,7 @@
   font-size: 10px;
 }
 
-.chapter > div {
+.chapterSummary > div {
   display: grid;
   gap: 5px;
 }
@@ -477,42 +682,63 @@
 
 @media (min-width: 1600px) {
   .intro {
-    left: max(5.3%, calc((100vw - 1600px) / 2));
+    left: 50%;
   }
 }
 
 @media (max-height: 760px) and (min-width: 721px) {
   .stage {
-    min-height: 610px;
+    min-height: 0;
+    --film-scale: 0.5;
+    --film-y: 70px;
   }
   .coordinates {
     display: none;
   }
+  .mobileChapter {
+    top: 100px;
+  }
+  .mobileChapter p {
+    margin-top: 0;
+    font-size: 32px;
+  }
   .intro h1 {
-    font-size: clamp(58px, 6vw, 86px);
+    font-size: clamp(28px, 3.4vw, 46px);
+    max-width: 64%;
   }
-  .eyebrow {
-    margin-bottom: 20px;
+  .intro {
+    top: 108px;
+    text-align: left;
   }
+  .eyebrow,
   .description {
-    margin-top: 22px;
+    display: none;
+  }
+  .introFooter {
+    position: absolute;
+    top: 5px;
+    right: 0;
+    margin: 0;
   }
   .actions {
-    margin-top: 24px;
+    margin-top: 0;
   }
   .filmPosition {
-    width: min(78%, 1120px);
+    width: min(96%, 1800px);
     top: 48%;
   }
 }
 
 @media (max-width: 1050px) {
+  .chapterRail {
+    display: none;
+  }
   .intro {
-    left: 4%;
-    width: 48%;
+    left: 50%;
+    width: 90%;
   }
   .intro h1 {
-    font-size: 7.3vw;
+    font-size: 5.1vw;
   }
   .eyebrow {
     font-size: 7px;
@@ -529,7 +755,7 @@
 
 @media (max-width: 720px) {
   .hero {
-    height: 220svh;
+    height: 280svh;
   }
   .stage {
     --film-scale: 0.96;
@@ -560,7 +786,8 @@
     letter-spacing: 0.07em;
   }
   .intro h1 {
-    font-size: clamp(48px, 11.9vw, 80px);
+    font-size: clamp(30px, 7vw, 50px);
+    max-width: none;
     line-height: 1;
     letter-spacing: -0.066em;
   }
@@ -568,15 +795,22 @@
     display: none;
   }
   .description {
-    margin-top: 18px;
+    margin: 0;
     font-size: 12px;
     line-height: 1.6;
   }
   .actions {
-    margin-top: 22px;
+    justify-content: center;
+    margin-top: 0;
     width: 100%;
     max-width: 420px;
     gap: 12px;
+    flex-wrap: wrap;
+  }
+  .introFooter {
+    flex-direction: column;
+    gap: 14px;
+    margin-top: 18px;
   }
   .noSetup {
     font-size: 10px;
@@ -595,12 +829,15 @@
     position: absolute;
     top: clamp(148px, 19svh, 184px);
     left: 6%;
-    display: block;
+    display: grid;
     width: 88%;
     opacity: var(--chapter-opacity, 0);
     transform: translateY(var(--chapter-y, 20px));
     pointer-events: none;
     will-change: transform, opacity;
+  }
+  .chapterPanel {
+    display: block;
   }
   .mobileChapterKicker {
     display: block;
@@ -636,6 +873,13 @@
     bottom: 155px;
     font-size: 22vw;
   }
+  .chapterEcho {
+    bottom: 18%;
+    font-size: 70vw;
+  }
+  .orbit {
+    inset: 12% -60%;
+  }
   .bottomBar {
     bottom: 28px;
     left: 6%;
@@ -643,7 +887,7 @@
     grid-template-columns: 1fr auto;
     gap: 22px 12px;
   }
-  .chapter {
+  .chapterSummary {
     gap: 10px;
   }
   .chapterNumber {
@@ -697,13 +941,16 @@
     margin-bottom: 15px;
   }
   .intro h1 {
-    font-size: 11vw;
+    font-size: 7vw;
   }
   .description {
-    margin-top: 14px;
+    margin-top: 0;
   }
   .actions {
-    margin-top: 15px;
+    margin-top: 0;
+  }
+  .introFooter {
+    margin-top: 14px;
   }
   .filmPosition {
     top: 53%;
@@ -728,14 +975,14 @@
     margin-bottom: 10px;
   }
   .intro h1 {
-    font-size: min(10.1vw, 48px);
+    font-size: clamp(28px, 7vw, 42px);
   }
   .description {
     font-size: 11px;
     line-height: 1.4;
   }
   .actions {
-    margin-top: 12px;
+    margin-top: 0;
   }
   .filmPosition {
     top: 55%;
@@ -768,6 +1015,20 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sceneBackdrop,
+  .orbit,
+  .chapterEcho,
+  .chapterRail {
+    display: none;
+  }
+  .film {
+    transform: none;
+    box-shadow: none;
+  }
+  .frameTop,
+  .frameCorner {
+    opacity: 1;
+  }
   .hero {
     height: auto;
   }
@@ -789,7 +1050,8 @@
     opacity: 1;
   }
   .intro h1 {
-    font-size: clamp(54px, 7vw, 100px);
+    font-size: clamp(30px, 5vw, 74px);
+    max-width: none;
   }
   .desktopBreak {
     display: none;

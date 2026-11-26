@@ -89,6 +89,14 @@ export const storySceneSchema = z
     asset: assetIdSchema,
     caption: z.string().trim().min(1).max(70),
     crop: cropSchema,
+    formatCrops: z
+      .object({
+        vertical: cropSchema.optional(),
+        landscape: cropSchema.optional(),
+        square: cropSchema.optional(),
+      })
+      .strict()
+      .optional(),
     weight: z.number().int().min(1).max(5),
     trimStart: z.number().min(0).max(29).default(0),
   })
@@ -168,6 +176,53 @@ export type VideoProps = {
   logo: Media | null;
   sceneMedia?: Record<string, Media>;
 };
+export function resolveStoryMedia(
+  assetId: string,
+  beforeId: string,
+  afterId: string,
+  before: Media,
+  after: Media,
+  sceneMedia: Record<string, Media>,
+): Media | null {
+  if (sceneMedia[assetId]) return sceneMedia[assetId];
+  if (assetId === beforeId) return before;
+  if (assetId === afterId) return after;
+  return null;
+}
+export function hasUsableClipTrim(
+  media: Media,
+  trimStart: number,
+  fps = VIDEO.fps,
+) {
+  return (
+    media.kind !== "video" ||
+    clipPlaybackFrames(media.duration, trimStart, fps) !== null
+  );
+}
+export function clipPlaybackFrames(
+  durationSeconds: number | undefined,
+  trimStart: number,
+  fps: number = VIDEO.fps,
+) {
+  if (
+    !Number.isFinite(durationSeconds) ||
+    !Number.isFinite(trimStart) ||
+    !Number.isFinite(fps) ||
+    fps <= 0 ||
+    trimStart < 0 ||
+    (durationSeconds! - trimStart) * fps < 1 - 1e-9
+  ) {
+    return null;
+  }
+
+  // Quantize both the full clip and trim point against the same frame grid.
+  // Subtracting independently rounded seconds can drop a valid final frame.
+  const totalFrames = Math.floor(durationSeconds! * fps + 1e-9);
+  const trimBefore = Math.floor(trimStart * fps);
+  const durationInFrames = totalFrames - trimBefore;
+  if (totalFrames < 1 || durationInFrames < 1) return null;
+  return { trimBefore, durationInFrames };
+}
 export function projectAssetIds(project: ProjectInput) {
   return [
     ...new Set(

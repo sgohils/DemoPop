@@ -1,0 +1,260 @@
+.page {
+  min-height: 100svh;
+  background: #090b0f;
+  color: #f5f4f0;
+  font-family: "DM Sans", Manrope, sans-serif;
+}
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  min-height: 82px;
+  padding: 20px clamp(20px, 5vw, 80px);
+  border-bottom: 1px solid #ffffff18;
+}
+.header :global(.brand),
+.footer :global(.brand) {
+  color: #f5f4f0;
+}
+.header :global(.brand-mark),
+.footer :global(.brand-mark) {
+  color: #dfff86;
+}
+.header nav {
+  display: flex;
+  gap: 26px;
+  font-size: 12px;
+}
+.header a,
+.footer a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.main {
+  width: min(1100px, 90%);
+  margin: auto;
+  padding: 82px 0 100px;
+}
+.intro {
+  margin-bottom: 58px;
+  text-align: center;
+}
+.eyebrow {
+  color: #dfff86;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  font-weight: 600;
+  margin: 0 0 22px;
+}
+.intro h1 {
+  font-size: clamp(44px, 7.3vw, 88px);
+  font-weight: 550;
+  line-height: 1.04;
+  letter-spacing: -0.06em;
+  margin: 0;
+}
+.intro h1 span {
+  color: #a8adbf;
+}
+.intro > p:last-child {
+  color: #b0b6c4;
+  font-size: 15px;
+  line-height: 1.9;
+  margin: 26px auto 0;
+}
+.details {
+  margin: 90px auto 0;
+  max-width: 760px;
+  scroll-margin-top: 35px;
+}
+.details h2 {
+  font-size: 36px;
+  letter-spacing: -0.045em;
+  margin: 0 0 30px;
+  font-weight: 500;
+}
+.details > div {
+  padding: 24px 0;
+  border-top: 1px solid #ffffff20;
+}
+.details h3 {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 0 0 10px;
+}
+.details p {
+  color: #b0b6c4;
+  font-size: 14px;
+  line-height: 1.9;
+}
+.details a {
+  color: #dfff86;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.message {
+  padding: 18px 22px;
+  border: 1px solid #535c43;
+  color: #dbe6c8;
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 0 0 25px;
+  border-radius: 5px;
+}
+.error {
+  border-color: #a96368;
+  color: #ffcccf;
+}
+.footer {
+  border-top: 1px solid #ffffff18;
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 35px 5%;
+  font-size: 12px;
+  color: #a8adbf;
+}
+.accountGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin: 28px 0;
+}
+.returnProject {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 24px;
+  border-color: #617a3f;
+  background: linear-gradient(120deg, #1a2318, #12161c);
+}
+.returnProject > div {
+  flex: 1 1 300px;
+}
+.returnProject h2 {
+  margin-bottom: 10px;
+}
+.returnProject p {
+  margin-bottom: 0;
+}
+.returnProject > a {
+  border: 1px solid #6b8052;
+  border-radius: 5px;
+  padding: 13px 17px;
+  flex-shrink: 0;
+}
+.accountCard {
+  border: 1px solid #343a43;
+  border-radius: 10px;
+  padding: 30px;
+  background: #12161c;
+}
+.accountCard h2 {
+  font-size: 21px;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+.balance {
+  font-size: 60px;
+  letter-spacing: -0.06em;
+  margin: 0;
+}
+.accountCard p {
+  font-size: 13px;
+  color: #b0b6c4;
+  line-height: 1.8;
+}
+.accountCard a,
+.projectList a {
+  color: #dfff86;
+}
+.accountCard button,
+.page .refresh {
+  padding: 12px 18px;
+  background: #dfff86;
+  color: #17200e;
+  border: 0;
+  border-radius: 5px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.accountCard button:disabled,
+.refresh:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.accountActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+.accountActions a {
+  color: #dfff86;
+  font-size: 13px;
+}
+.accountActions a,
+.accountCard a,
+.projectList a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.projectList {
+  list-style: none;
+  padding: 0;
+}
+.projectList li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 22px 0;
+  border-bottom: 1px solid #ffffff20;
+  font-size: 13px;
+}
+.projectList p {
+  color: #a8adbf;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.page a:focus-visible,
+.page button:focus-visible {
+  outline: 3px solid #899bff;
+  outline-offset: 5px;
+}
+@media (max-width: 650px) {
+  .header {
+    align-items: flex-start;
+    gap: 16px;
+  }
+  .header nav {
+    justify-content: flex-end;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 11px;
+  }
+  .main {
+    padding-top: 55px;
+  }
+  .accountGrid {
+    grid-template-columns: 1fr;
+  }
+  .footer {
+    flex-direction: column;
+  }
+}

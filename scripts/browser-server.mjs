@@ -35,6 +35,12 @@ const env = preview
         ? "mocked-ui-publishable-key"
         : "",
       SUPABASE_SERVICE_ROLE_KEY: cloudUI ? "mocked-ui-service-key" : "",
+      DEMOPOP_BILLING_ENABLED: cloudUI ? "1" : "0",
+      APP_ORIGIN: `http://127.0.0.1:${port}`,
+      STRIPE_SECRET_KEY: cloudUI ? "sk_test_mocked_ui" : "",
+      STRIPE_WEBHOOK_SECRET: cloudUI ? "whsec_mocked_ui" : "",
+      STRIPE_PACKAGE_PRICE_ID: cloudUI ? "price_package_ui" : "",
+      STRIPE_STUDIO_PRICE_ID: cloudUI ? "price_studio_ui" : "",
       DEMOPOP_TEST_DIST_DIR: cloudUI
         ? ".next-browser-cloud-ui"
         : ".next-browser",

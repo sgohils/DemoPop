@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   ArrowUpRight,
   Monitor,
@@ -30,6 +30,8 @@ const notes = {
 export function HomeShowcase() {
   const [template, setTemplate] = useState<ProjectInput["template"]>("launch");
   const [format, setFormat] = useState<ProjectInput["format"]>("landscape");
+  const verticalFormatButton = useRef<HTMLButtonElement>(null);
+  const landscapeFormatButton = useRef<HTMLButtonElement>(null);
   const selected = TEMPLATES.find((item) => item.id === template)!;
   const project = template === "launch" ? launchProject : sampleProject;
   return (
@@ -45,19 +47,35 @@ export function HomeShowcase() {
             aria-label="Sample video format"
           >
             <button
+              ref={verticalFormatButton}
               type="button"
               aria-label="Portrait sample"
               aria-pressed={format === "vertical"}
               onClick={() => setFormat("vertical")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowRight" && event.key !== "ArrowDown")
+                  return;
+                event.preventDefault();
+                setFormat("landscape");
+                landscapeFormatButton.current?.focus();
+              }}
             >
               <Smartphone size={13} />
               9:16
             </button>
             <button
+              ref={landscapeFormatButton}
               type="button"
               aria-label="Landscape sample"
               aria-pressed={format === "landscape"}
               onClick={() => setFormat("landscape")}
+              onKeyDown={(event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowUp")
+                  return;
+                event.preventDefault();
+                setFormat("vertical");
+                verticalFormatButton.current?.focus();
+              }}
             >
               <Monitor size={14} />
               16:9

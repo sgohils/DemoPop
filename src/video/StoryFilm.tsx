@@ -11,10 +11,14 @@ import {
 import type { CSSProperties } from "react";
 import {
   FONTS,
+  VIDEO,
   coverGeometry,
   type Media,
   type VideoProps,
   type ProjectInput,
+  resolveStoryMedia,
+  hasUsableClipTrim,
+  clipPlaybackFrames,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
 import { launchAccent, fitLaunchText } from "./launch-motion";
@@ -97,10 +101,10 @@ function Shot({
     left: base.left * zoom + width * 0.5 * (1 - zoom),
     top: base.top * zoom + height * 0.5 * (1 - zoom),
   };
-  const trim = Math.max(
-    0,
-    Math.min(trimStart, (media.duration ?? 30) - 1 / 30),
-  );
+  const clipFrames =
+    media.kind === "video"
+      ? clipPlaybackFrames(media.duration, trimStart, VIDEO.fps)
+      : null;
   return (
     <div
       style={{
@@ -115,15 +119,10 @@ function Shot({
       }}
     >
       {media.kind === "video" ? (
-        <Loop
-          durationInFrames={Math.max(
-            1,
-            Math.floor(((media.duration ?? 30) - trim) * 30),
-          )}
-        >
+        <Loop durationInFrames={clipFrames?.durationInFrames ?? 1}>
           <OffthreadVideo
             src={media.src}
-            trimBefore={Math.floor(trim * 30)}
+            trimBefore={clipFrames?.trimBefore ?? 0}
             muted
             style={style}
             onError={fail}
@@ -150,8 +149,33 @@ export function StoryFilm({
   const margin = wide ? 96 : 72;
   const accent = launchAccent(p.color);
   const timeline = storyTimeline(p);
-  const resolve = (id: string) =>
-    sceneMedia[id] ?? (id === p.before ? before : after);
+  const unresolvedScenes = timeline.beats.filter((beat) => {
+    const media = resolveStoryMedia(
+      beat.asset,
+      p.before,
+      p.after,
+      before,
+      after,
+      sceneMedia,
+    );
+    return !media || !hasUsableClipTrim(media, beat.trimStart, VIDEO.fps);
+  });
+  if (unresolvedScenes.length > 0) fail();
+  const resolve = (id: string) => {
+    const media = resolveStoryMedia(
+      id,
+      p.before,
+      p.after,
+      before,
+      after,
+      sceneMedia,
+    );
+    if (!media) {
+      fail();
+      return after;
+    }
+    return media;
+  };
   const header = (
     <div
       style={{
@@ -202,6 +226,33 @@ export function StoryFilm({
       }}
     >
       <VideoFont key={p.font} font={p.font} />
+      {unresolvedScenes.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            position: "absolute",
+            zIndex: 100,
+            top: 104,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: `min(${width - margin * 2}px, 720px)`,
+            padding: "18px 22px",
+            border: "1px solid #ffb4a6",
+            borderRadius: 12,
+            background: "#351b20f2",
+            color: "#fff4f1",
+            fontSize: 20,
+            lineHeight: 1.4,
+            boxShadow: "0 14px 44px #0008",
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: 5 }}>
+            Some scene media needs attention.
+          </strong>
+          Restore missing media or move each clip start before its end, then
+          preview again.
+        </div>
+      )}
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 90% 100%, ${p.color}28, transparent 60%), linear-gradient(145deg,#171b29,transparent 65%)`,

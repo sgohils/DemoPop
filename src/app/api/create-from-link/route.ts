@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
     const request = await readLinkVideoRequest(req);
     if (cloudConfigured())
       return linkVideoJson(await createCloudLinkVideo(request), 202);
+    if (request.previewOnly)
+      return linkVideoJson({ error: "Sign in to save a website preview. You can try your own media in the studio." }, 503);
     const job = await reserveLocalLinkVideo(req);
     after(() => runLocalLinkVideo(job, request));
     return linkVideoJson(

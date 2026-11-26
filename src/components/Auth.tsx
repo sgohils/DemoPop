@@ -35,8 +35,8 @@ export function Auth({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...Object.fromEntries(form),
-          ...(mode !== "recover" && safeAuthNext(next) === "/create"
-            ? { next: "/create" }
+          ...(mode !== "recover" && safeAuthNext(next) !== "/projects"
+            ? { next: safeAuthNext(next) }
             : {}),
         }),
       });
