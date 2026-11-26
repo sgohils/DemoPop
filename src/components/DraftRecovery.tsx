@@ -80,11 +80,12 @@ export function DraftRecovery({
     };
   }, [key, ready, candidate, project, dirty, assets]);
   async function restore() {
-    if (!candidate) return;
+    const draft = candidate?.key === key ? candidate : null;
+    if (!draft) return;
     setBusy(true);
     setError("");
     try {
-      await onRestore(candidate);
+      await onRestore(draft);
       setCandidate(null);
       setMessage(
         scope === "local"
@@ -110,12 +111,15 @@ export function DraftRecovery({
     }
   }
   if (!key) return null;
+  // A project switch renders before the read effect clears the old state.
+  // Never offer another project's draft during that transition.
+  const currentCandidate = candidate?.key === key ? candidate : null;
   return (
     <div className="draft-status">
-      {candidate ? (
+      {currentCandidate ? (
         <div className="draft-recovery">
           <span>
-            A draft from {new Date(candidate.updatedAt).toLocaleString()} is
+            A draft from {new Date(currentCandidate.updatedAt).toLocaleString()} is
             available on this device.
           </span>
           <button
