@@ -196,13 +196,32 @@ export function hasUsableClipTrim(
 ) {
   return (
     media.kind !== "video" ||
-    (Number.isFinite(media.duration) &&
-      Number.isFinite(trimStart) &&
-      Number.isFinite(fps) &&
-      fps > 0 &&
-      trimStart >= 0 &&
-      (media.duration! - trimStart) * fps >= 1 - 1e-9)
+    clipPlaybackFrames(media.duration, trimStart, fps) !== null
   );
+}
+export function clipPlaybackFrames(
+  durationSeconds: number | undefined,
+  trimStart: number,
+  fps: number = VIDEO.fps,
+) {
+  if (
+    !Number.isFinite(durationSeconds) ||
+    !Number.isFinite(trimStart) ||
+    !Number.isFinite(fps) ||
+    fps <= 0 ||
+    trimStart < 0 ||
+    (durationSeconds! - trimStart) * fps < 1 - 1e-9
+  ) {
+    return null;
+  }
+
+  // Quantize both the full clip and trim point against the same frame grid.
+  // Subtracting independently rounded seconds can drop a valid final frame.
+  const totalFrames = Math.floor(durationSeconds! * fps + 1e-9);
+  const trimBefore = Math.floor(trimStart * fps);
+  const durationInFrames = totalFrames - trimBefore;
+  if (totalFrames < 1 || durationInFrames < 1) return null;
+  return { trimBefore, durationInFrames };
 }
 export function projectAssetIds(project: ProjectInput) {
   return [

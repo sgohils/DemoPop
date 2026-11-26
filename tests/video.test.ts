@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   coverGeometry,
+  clipPlaybackFrames,
   hasUsableClipTrim,
   resolveStoryMedia,
 } from "../src/shared/project";
@@ -86,6 +87,23 @@ test("clip trims preserve at least one frame of verified footage", () => {
   assert.equal(hasUsableClipTrim(clip, 1), false);
   assert.equal(hasUsableClipTrim({ ...clip, duration: undefined }, 0), false);
   assert.equal(hasUsableClipTrim({ ...clip, kind: undefined }, 900, 30), true);
+});
+
+test("clip playback keeps trims and remaining footage on the same frame grid", () => {
+  assert.deepEqual(clipPlaybackFrames(1, 0.333333334, 30), {
+    trimBefore: 10,
+    durationInFrames: 20,
+  });
+  assert.deepEqual(clipPlaybackFrames(1, 29 / 30, 30), {
+    trimBefore: 29,
+    durationInFrames: 1,
+  });
+  assert.equal(clipPlaybackFrames(1, 0.99999, 30), null);
+  assert.equal(clipPlaybackFrames(1, 1, 30), null);
+  assert.deepEqual(clipPlaybackFrames(2, 0.5, 24), {
+    trimBefore: 12,
+    durationInFrames: 36,
+  });
 });
 
 test("brand text stays readable for light, dark and saturated colors", () => {

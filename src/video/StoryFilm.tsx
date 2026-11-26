@@ -18,6 +18,7 @@ import {
   type ProjectInput,
   resolveStoryMedia,
   hasUsableClipTrim,
+  clipPlaybackFrames,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
 import { launchAccent, fitLaunchText } from "./launch-motion";
@@ -100,10 +101,10 @@ function Shot({
     left: base.left * zoom + width * 0.5 * (1 - zoom),
     top: base.top * zoom + height * 0.5 * (1 - zoom),
   };
-  const trim = Math.max(
-    0,
-    Math.min(trimStart, (media.duration ?? 30) - 1 / 30),
-  );
+  const clipFrames =
+    media.kind === "video"
+      ? clipPlaybackFrames(media.duration, trimStart, VIDEO.fps)
+      : null;
   return (
     <div
       style={{
@@ -118,15 +119,10 @@ function Shot({
       }}
     >
       {media.kind === "video" ? (
-        <Loop
-          durationInFrames={Math.max(
-            1,
-            Math.floor(((media.duration ?? 30) - trim) * 30),
-          )}
-        >
+        <Loop durationInFrames={clipFrames?.durationInFrames ?? 1}>
           <OffthreadVideo
             src={media.src}
-            trimBefore={Math.floor(trim * 30)}
+            trimBefore={clipFrames?.trimBefore ?? 0}
             muted
             style={style}
             onError={fail}
