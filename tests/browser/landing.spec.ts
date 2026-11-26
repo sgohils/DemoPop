@@ -203,6 +203,30 @@ test("the opening expands into a cinema view and chapter controls follow native 
   await page.screenshot({
     path: "out/qa/immersive-scroll/desktop-opening.png",
   });
+  const create = hero.getByRole("link", {
+    name: "Create from a website",
+    exact: true,
+  });
+  const watch = page.getByRole("button", {
+    name: "Watch the film",
+    exact: true,
+  });
+  await create.focus();
+  const heroStart = await hero.evaluate(
+    (element) => element.getBoundingClientRect().top + scrollY,
+  );
+  const scrollDistance = await hero.evaluate(
+    (element) => element.clientHeight - innerHeight,
+  );
+  await page.evaluate(
+    ({ start, distance }) => window.scrollTo(0, start + distance * 0.4),
+    { start: heroStart, distance: scrollDistance },
+  );
+  await expect
+    .poll(async () => Number(await hero.getAttribute("data-scroll-progress")))
+    .toBeCloseTo(0.4, 2);
+  await expect(create).toHaveAttribute("tabindex", "-1");
+  await expect(watch).toBeFocused();
   const rail = page.getByRole("navigation", { name: "Film chapters" });
   await rail
     .getByRole("button", { name: "Scroll to The reveal", exact: true })

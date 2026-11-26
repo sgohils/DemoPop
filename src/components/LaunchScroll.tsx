@@ -353,6 +353,12 @@ export function LaunchScroll() {
         introLinks.forEach((link) => {
           link.tabIndex = interactive ? 0 : -1;
         });
+        if (
+          !interactive &&
+          introLinks.some((link) => link === document.activeElement)
+        ) {
+          watchButton.current?.focus({ preventScroll: true });
+        }
       }
       surface.style.setProperty("--ambient", `${0.2 + 0.8 * eased}`);
       surface.dataset.scrollProgress = amount.toFixed(3);
