@@ -37,14 +37,17 @@ export function LaunchCampaign() {
     const visibility = () => {
       if (document.hidden) pause();
     };
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) pause();
-    });
-    observer.observe(element);
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) pause();
+          })
+        : undefined;
+    observer?.observe(element);
     document.addEventListener("visibilitychange", visibility);
     return () => {
       pause();
-      observer.disconnect();
+      observer?.disconnect();
       document.removeEventListener("visibilitychange", visibility);
     };
   }, []);

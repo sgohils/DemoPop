@@ -117,7 +117,7 @@ export function LaunchScroll() {
     let raf = 0;
     let targetTime = 0;
     let loaded = false;
-    let visible = false;
+    let visible = typeof IntersectionObserver !== "function";
     let currentChapter = -1;
     let disposed = false;
     let displayedAmount: number | null = null;
@@ -399,7 +399,10 @@ export function LaunchScroll() {
       previousTime = 0;
       schedule();
     };
-    const resizeObserver = new ResizeObserver(invalidateLayout);
+    const resizeObserver =
+      typeof ResizeObserver === "function"
+        ? new ResizeObserver(invalidateLayout)
+        : undefined;
     for (const node of [
       element,
       surface,
@@ -407,17 +410,20 @@ export function LaunchScroll() {
       mobileChapter.current,
       bottomBar.current,
     ]) {
-      if (node) resizeObserver.observe(node);
+      if (node) resizeObserver?.observe(node);
     }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        visible = entry.isIntersecting;
-        if (!visible) film.pause();
-        schedule();
-      },
-      { rootMargin: "320px 0px" },
-    );
-    observer.observe(element);
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(
+            ([entry]) => {
+              visible = entry.isIntersecting;
+              if (!visible) film.pause();
+              schedule();
+            },
+            { rootMargin: "320px 0px" },
+          )
+        : undefined;
+    observer?.observe(element);
     film.addEventListener("loadedmetadata", metadata);
     film.addEventListener("seeked", seek);
     window.addEventListener("scroll", schedule, { passive: true });
@@ -437,8 +443,8 @@ export function LaunchScroll() {
       unlockPage.current?.();
       unlockPage.current = null;
       if (raf) window.cancelAnimationFrame(raf);
-      observer.disconnect();
-      resizeObserver.disconnect();
+      observer?.disconnect();
+      resizeObserver?.disconnect();
       film.pause();
       film.removeEventListener("loadedmetadata", metadata);
       film.removeEventListener("seeked", seek);

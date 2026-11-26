@@ -61,16 +61,19 @@ export function Preview({
   useEffect(() => {
     const element = surface.current;
     if (!pauseWhenOffscreen || !element) return;
-    const observer = new IntersectionObserver(([entry]) => {
-      if (!entry.isIntersecting) ref.current?.pause();
-    });
+    const observer =
+      typeof IntersectionObserver === "function"
+        ? new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting) ref.current?.pause();
+          })
+        : undefined;
     const visibility = () => {
       if (document.hidden) ref.current?.pause();
     };
-    observer.observe(element);
+    observer?.observe(element);
     document.addEventListener("visibilitychange", visibility);
     return () => {
-      observer.disconnect();
+      observer?.disconnect();
       document.removeEventListener("visibilitychange", visibility);
     };
   }, [pauseWhenOffscreen]);

@@ -39,7 +39,10 @@ export function LandingMotion({ children }: { children: ReactNode }) {
       const nodes = element.querySelectorAll<HTMLElement>(
         "[data-reveal], [data-animate]",
       );
-      if (reduced.matches || !("IntersectionObserver" in window)) {
+      if (
+        reduced.matches ||
+        typeof window.IntersectionObserver !== "function"
+      ) {
         nodes.forEach((node) => {
           node.dataset.seen = "true";
           node.dataset.active = "false";
@@ -271,6 +274,10 @@ export function LandingGallery() {
   useEffect(() => {
     const element = root.current;
     if (!element) return;
+    if (typeof IntersectionObserver !== "function") {
+      setNear(true);
+      return;
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
