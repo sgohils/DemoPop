@@ -32,6 +32,7 @@ export function HomeShowcase() {
   const [format, setFormat] = useState<ProjectInput["format"]>("landscape");
   const verticalFormatButton = useRef<HTMLButtonElement>(null);
   const landscapeFormatButton = useRef<HTMLButtonElement>(null);
+  const templateButtons = useRef<Array<HTMLButtonElement | null>>([]);
   const selected = TEMPLATES.find((item) => item.id === template)!;
   const project = template === "launch" ? launchProject : sampleProject;
   return (
@@ -117,10 +118,27 @@ export function HomeShowcase() {
             <button
               className={styles.styleButton}
               key={item.id}
+              ref={(element) => {
+                templateButtons.current[index] = element;
+              }}
               type="button"
               aria-label={`${item.name} sample`}
               aria-pressed={template === item.id}
               onClick={() => setTemplate(item.id)}
+              onKeyDown={(event) => {
+                const direction =
+                  event.key === "ArrowRight" || event.key === "ArrowDown"
+                    ? 1
+                    : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                      ? -1
+                      : 0;
+                if (!direction) return;
+                event.preventDefault();
+                const nextIndex =
+                  (index + direction + TEMPLATES.length) % TEMPLATES.length;
+                setTemplate(TEMPLATES[nextIndex].id);
+                templateButtons.current[nextIndex]?.focus();
+              }}
             >
               <span className={styles.styleNumber}>0{index + 1}</span>
               <span>
