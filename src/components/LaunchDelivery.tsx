@@ -49,7 +49,9 @@ export function LaunchDelivery({
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [reload, setReload] = useState(0),
-    [reviewOpen, setReviewOpen] = useState(false);
+    [reviewOpen, setReviewOpen] = useState(false),
+    [loadedReviewScope, setLoadedReviewScope] = useState("");
+  const reviewDataScope = `${projectId ?? ""}:${authorized}`;
   const reviewScope = `${projectId ?? ""}:${authorized}:${reviewOpen}`;
   const activeReviewScope = useRef(reviewScope);
   useLayoutEffect(() => {
@@ -64,7 +66,10 @@ export function LaunchDelivery({
     setJobs([]);
     setJobId("");
     setReviewLoadError("");
-    if (!authorized || !projectId || !reviewOpen) return;
+    if (!authorized || !projectId || !reviewOpen) {
+      setReviewLoading(false);
+      return;
+    }
     setReviewLoading(true);
     void Promise.all(
       [
@@ -89,6 +94,7 @@ export function LaunchDelivery({
               : (availableJobs[0]?.id ?? ""),
           );
           setReviews(links.reviews);
+          setLoadedReviewScope(reviewDataScope);
         }
       })
       .catch((error) => {
@@ -100,7 +106,11 @@ export function LaunchDelivery({
     return () => {
       live = false;
     };
-  }, [authorized, projectId, revision, reload, reviewOpen]);
+  }, [authorized, projectId, revision, reload, reviewOpen, reviewDataScope]);
+  const visibleJobs =
+    loadedReviewScope === reviewDataScope ? jobs : [];
+  const visibleReviews =
+    loadedReviewScope === reviewDataScope ? reviews : [];
   const hooks = launchHooks(project);
   async function createLink() {
     const requestScope = reviewScope;
@@ -112,9 +122,9 @@ export function LaunchDelivery({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jobId: jobs.some((job) => job.id === jobId)
+          jobId: visibleJobs.some((job) => job.id === jobId)
             ? jobId
-            : jobs[0]?.id,
+            : visibleJobs[0]?.id,
           agencyName: agency,
           allowDownload: download,
         }),
@@ -209,14 +219,14 @@ export function LaunchDelivery({
         <label className="field">
           <span>Version to review</span>
           <select
-            value={jobId || jobs[0]?.id || ""}
+            value={jobId || visibleJobs[0]?.id || ""}
             onChange={(event) => setJobId(event.target.value)}
-            disabled={!jobs.length}
+            disabled={!visibleJobs.length}
           >
             <option value="" disabled>
               Select an available export
             </option>
-            {jobs.map((job) => (
+            {visibleJobs.map((job) => (
               <option key={job.id} value={job.id}>
                 {job.output_kind === "launch-pack" ? "Launch package" : "Video"}{" "}
                 ·{" "}
@@ -240,7 +250,7 @@ export function LaunchDelivery({
           disabled={
             !authorized ||
             !projectId ||
-            !jobs.length ||
+            !visibleJobs.length ||
             !agency.trim() ||
             working
           }
@@ -286,17 +296,17 @@ export function LaunchDelivery({
             <p className="section-hint" role="status">
               Sign in and save this project to manage client review links.
             </p>
-          ) : jobs.length === 0 ? (
+          ) : visibleJobs.length === 0 ? (
             <p className="section-hint" role="status">
               Complete an export before creating a client review link.
             </p>
-          ) : reviews.every((review) => review.revoked_at) ? (
+          ) : visibleReviews.every((review) => review.revoked_at) ? (
             <p className="section-hint" role="status">
               No active review links yet. Create one for a completed export
               above.
             </p>
           ) : null}
-          {!reviewLoading && !reviewLoadError && reviews
+          {!reviewLoading && !reviewLoadError && visibleReviews
             .filter((review) => !review.revoked_at)
             .map((review) => (
               <article key={review.id}>
