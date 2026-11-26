@@ -19,6 +19,7 @@ export function storyCrop(scene: StoryScene, format: ProjectInput["format"]) {
 }
 
 export function launchHooks(project: ProjectInput): string[] {
+  // Edited hooks belong to the user and must remain verbatim while typing.
   if (project.hooks) return project.hooks;
   const hooks = [
     project.opening,
@@ -32,14 +33,29 @@ export function launchHooks(project: ProjectInput): string[] {
     "See what happens next.",
     "Your next big move starts here.",
   ];
+  const normalize = (hook: string) =>
+    hook.trim().replace(/\s+/g, " ").toLowerCase();
+  const reserved = new Set(hooks.map(normalize));
   const used = new Set<string>();
-  return hooks.map((hook) => {
-    const copy =
-      hook.trim() && !used.has(hook)
-        ? hook
-        : alternatives.find((copy) => !used.has(copy))!;
-    used.add(copy);
-    return copy;
+  return hooks.map((hook, index) => {
+    const key = normalize(hook);
+    if (key && !used.has(key)) {
+      used.add(key);
+      return hook;
+    }
+    const fallback =
+      alternatives.find((copy) => {
+        const fallbackKey = normalize(copy);
+        const reservedForLater = hooks
+          .slice(index + 1)
+          .some((later) => normalize(later) === fallbackKey);
+        return (
+          !used.has(fallbackKey) &&
+          (!reserved.has(fallbackKey) || !reservedForLater)
+        );
+      }) ?? "A fresh perspective starts here.";
+    used.add(normalize(fallback));
+    return fallback;
   });
 }
 export function packageVariants(project: ProjectInput) {

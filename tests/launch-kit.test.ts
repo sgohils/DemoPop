@@ -123,6 +123,30 @@ test("launch package captures nine independent variants without mutating its pro
     ).size,
     3,
   );
+  const editedHooks = [
+    "Meet Orbit.",
+    "  meet   orbit.  ",
+    "A new way forward.",
+  ];
+  assert.deepEqual(
+    launchHooks({ ...launchProject, hooks: editedHooks }),
+    editedHooks,
+  );
+  const generatedProject = {
+    ...launchProject,
+    opening: " Meet  Orbit. ",
+    story: story(),
+  };
+  generatedProject.story.scenes[0].caption = "meet orbit.";
+  const duplicateHooks = launchHooks(generatedProject);
+  assert.equal(
+    new Set(
+      duplicateHooks.map((hook) =>
+        hook.trim().replace(/\s+/g, " ").toLowerCase(),
+      ),
+    ).size,
+    3,
+  );
 });
 
 test("story typing groups independently, while reorder and asset replacement remain undoable", () => {
