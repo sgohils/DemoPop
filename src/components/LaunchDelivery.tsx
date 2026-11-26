@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Package, Link2, Copy, Loader2, X, Play } from "lucide-react";
 import { launchHooks } from "../shared/launch-kit";
 import type { ProjectInput } from "../shared/project";
@@ -50,6 +50,14 @@ export function LaunchDelivery({
     [notice, setNotice] = useState(""),
     [reload, setReload] = useState(0),
     [reviewOpen, setReviewOpen] = useState(false);
+  const reviewScope = `${projectId ?? ""}:${authorized}:${reviewOpen}`;
+  const activeReviewScope = useRef(reviewScope);
+  useLayoutEffect(() => {
+    activeReviewScope.current = reviewScope;
+    setWorking(false);
+    setError("");
+    setNotice("");
+  }, [reviewScope]);
   useEffect(() => {
     let live = true;
     setReviews([]);
@@ -95,6 +103,7 @@ export function LaunchDelivery({
   }, [authorized, projectId, revision, reload, reviewOpen]);
   const hooks = launchHooks(project);
   async function createLink() {
+    const requestScope = reviewScope;
     setWorking(true);
     setError("");
     setNotice("");
@@ -112,14 +121,16 @@ export function LaunchDelivery({
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body.error);
+      if (activeReviewScope.current !== requestScope) return;
       setReload((value) => value + 1);
       setNotice(
         "Review link created. Copy it below to share with your client.",
       );
     } catch (error) {
-      setError((error as Error).message);
+      if (activeReviewScope.current === requestScope)
+        setError((error as Error).message);
     } finally {
-      setWorking(false);
+      if (activeReviewScope.current === requestScope) setWorking(false);
     }
   }
   return (
@@ -329,6 +340,7 @@ export function LaunchDelivery({
                     className="text-link"
                     disabled={working}
                     onClick={async () => {
+                      const requestScope = reviewScope;
                       setWorking(true);
                       setError("");
                       try {
@@ -338,12 +350,15 @@ export function LaunchDelivery({
                         );
                         const body = await response.json();
                         if (!response.ok) throw new Error(body.error);
+                        if (activeReviewScope.current !== requestScope) return;
                         setReload((value) => value + 1);
                         setNotice("Review link revoked.");
                       } catch (error) {
-                        setError((error as Error).message);
+                        if (activeReviewScope.current === requestScope)
+                          setError((error as Error).message);
                       } finally {
-                        setWorking(false);
+                        if (activeReviewScope.current === requestScope)
+                          setWorking(false);
                       }
                     }}
                   >
