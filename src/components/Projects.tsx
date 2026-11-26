@@ -167,14 +167,19 @@ export function Projects({ configured }: { configured: boolean }) {
       setSigningOut(false);
     }
   }
-  const matchingProjects = projects.filter(
-    (project) =>
-      `${project.name} ${project.client || ""}`
-        .toLowerCase()
-        .includes(query.trim().toLowerCase()) &&
+  const matchingProjects = projects.filter((project) => {
+    const templateName =
+      TEMPLATES.find((template) => template.id === project.template)?.name ||
+      "";
+    const searchable = `${project.name} ${project.client || ""} ${project.format || ""} ${templateName}`;
+    return (
+      searchable.toLowerCase().includes(query.trim().toLowerCase()) &&
       (!folder ||
-        (folder === "__unfiled" ? !project.client : project.client === folder)),
-  );
+        (folder === "__unfiled"
+          ? !project.client
+          : project.client === folder))
+    );
+  });
   const folders = [
     ...new Set(
       projects
@@ -493,12 +498,22 @@ export function Projects({ configured }: { configured: boolean }) {
             {!matchingProjects.length && (
               <div className={styles.noResults}>
                 <Search size={24} />
-                <h2>No projects match that search.</h2>
+                <h2>
+                  {query.trim()
+                    ? "No projects match those filters."
+                    : "No projects in this client folder."}
+                </h2>
                 <p>
-                  Try another name, or clear the search to see your projects.
+                  Clear the search and client filter to see all your projects.
                 </p>
-                <button className="text-link" onClick={() => setQuery("")}>
-                  Clear search <X size={13} />
+                <button
+                  className="text-link"
+                  onClick={() => {
+                    setQuery("");
+                    setFolder("");
+                  }}
+                >
+                  Clear filters <X size={13} />
                 </button>
               </div>
             )}

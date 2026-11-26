@@ -22,6 +22,7 @@ import {
   launchAfterGeometry,
   launchDetailZoom,
   launchShotGeometry,
+  displayVideoUrl,
 } from "./launch-motion";
 
 const BLACK = "#08090c";
@@ -657,7 +658,7 @@ export function Launch({ project: p, before, after, logo }: VideoProps) {
     p.font,
   );
   const closingUrl = fitStudioText(
-    p.url.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+    displayVideoUrl(p.url),
     wide ? 1360 : 680,
     wide ? 120 : 160,
     wide ? 36 : 38,

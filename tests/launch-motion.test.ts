@@ -14,7 +14,17 @@ import {
   launchShotGeometry,
   launchWindow,
   launchTextWidth,
+  displayVideoUrl,
 } from "../src/video/launch-motion";
+
+test("end cards show clean URLs regardless of scheme casing or trailing slashes", () => {
+  assert.equal(
+    displayVideoUrl("HTTPS://orbit.example/path///"),
+    "orbit.example/path",
+  );
+  assert.equal(displayVideoUrl(" https://orbit.example/ "), "orbit.example");
+  assert.equal(displayVideoUrl("orbit.example///"), "orbit.example");
+});
 
 test("launch motion holds exactly at scene boundaries", () => {
   assert.equal(launchProgress(-20, 10, 30), 0);

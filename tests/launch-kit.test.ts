@@ -123,6 +123,30 @@ test("launch package captures nine independent variants without mutating its pro
     ).size,
     3,
   );
+  const editedHooks = [
+    "Meet Orbit.",
+    "  meet   orbit.  ",
+    "A new way forward.",
+  ];
+  assert.deepEqual(
+    launchHooks({ ...launchProject, hooks: editedHooks }),
+    editedHooks,
+  );
+  const generatedProject = {
+    ...launchProject,
+    opening: " Meet  Orbit. ",
+    story: story(),
+  };
+  generatedProject.story.scenes[0].caption = "meet orbit.";
+  const duplicateHooks = launchHooks(generatedProject);
+  assert.equal(
+    new Set(
+      duplicateHooks.map((hook) =>
+        hook.trim().replace(/\s+/g, " ").toLowerCase(),
+      ),
+    ).size,
+    3,
+  );
 });
 
 test("story typing groups independently, while reorder and asset replacement remain undoable", () => {
@@ -212,6 +236,14 @@ test("ZIP output has correct checksums, central records and safe archive filenam
   assert.equal(zip.readUInt16LE(zip.length - 14), 2);
   for (const name of ["../secret", "/absolute", "C:\\file", "a/b.mp4"])
     assert.throws(() => zipFiles([{ name, data: Buffer.alloc(0) }]));
+  assert.throws(
+    () => zipFiles(Array.from({ length: 0x10000 }, () => files[0])),
+    /too many files/,
+  );
+  assert.throws(
+    () => zipFiles([{ name: "bad-data.mp4", data: "not a buffer" as never }]),
+    /too large/,
+  );
 });
 
 test("website capture rejects local, mapped, reserved, credentialed and non-web targets", () => {

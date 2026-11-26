@@ -21,7 +21,8 @@ import {
   clipPlaybackFrames,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
-import { launchAccent, fitLaunchText } from "./launch-motion";
+import { launchAccent, fitLaunchText, displayVideoUrl } from "./launch-motion";
+import { storyOpeningShotBox } from "./story-layout";
 import { VideoFont } from "./VideoFont";
 
 const fail = () => {
@@ -215,6 +216,7 @@ export function StoryFilm({
     </div>
   );
   const entrance = ease(frame, 0, 14);
+  const openingShot = storyOpeningShotBox(width, height);
   return (
     <AbsoluteFill
       data-story-frame={frame}
@@ -286,16 +288,16 @@ export function StoryFilm({
           <div
             style={{
               position: "absolute",
-              left: wide ? 980 : margin,
-              top: wide ? 220 : square ? 590 : 1050,
+              left: openingShot.left,
+              top: openingShot.top,
             }}
           >
             <Sequence from={0} layout="none">
               <Shot
                 media={resolve(timeline.beats[0].asset)}
                 crop={timeline.beats[0].crop}
-                width={wide ? 970 : width - margin * 2}
-                height={wide ? 680 : square ? 540 : 650}
+                width={openingShot.width}
+                height={openingShot.height}
                 duration={timeline.openingEnd}
                 trimStart={timeline.beats[0].trimStart}
               />
@@ -366,7 +368,7 @@ export function StoryFilm({
             style={{ color: "#b9bfce", marginTop: 44 }}
           />
           <Copy
-            text={p.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+            text={displayVideoUrl(p.url)}
             width={width - margin * 2}
             height={100}
             size={32}

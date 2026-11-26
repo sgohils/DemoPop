@@ -8,6 +8,7 @@ import {
 } from "remotion";
 import { coverGeometry, FONTS, type VideoProps } from "../shared/project";
 import { VideoFont } from "./VideoFont";
+import { displayVideoUrl } from "./launch-motion";
 import {
   highlightGeometry,
   mixColor,
@@ -333,7 +334,7 @@ export function Reveal({ project: p, before, after, logo }: VideoProps) {
         <div
           style={{ fontSize: 36, lineHeight: 1.4, overflowWrap: "anywhere" }}
         >
-          {p.url}
+          {displayVideoUrl(p.url)}
         </div>
       </div>
       <div

@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import {
   projectSchema,
   type ProjectInput,
+  type Media,
   type VideoProps,
 } from "../shared/project";
 import { VIDEO_GOALS } from "../shared/link-video";
@@ -110,6 +111,33 @@ function safeMediaUrl(value: unknown) {
   } catch {
     return undefined;
   }
+}
+function isMedia(value: unknown): value is Media {
+  if (!value || typeof value !== "object") return false;
+  const media = value as Partial<Media>;
+  return (
+    typeof media.src === "string" &&
+    media.src.trim().length > 0 &&
+    typeof media.width === "number" &&
+    Number.isFinite(media.width) &&
+    media.width > 0 &&
+    typeof media.height === "number" &&
+    Number.isFinite(media.height) &&
+    media.height > 0 &&
+    (media.kind === undefined || media.kind === "video") &&
+    (media.duration === undefined || Number.isFinite(media.duration))
+  );
+}
+async function readResponseObject(response: Response, message: string) {
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch {
+    throw new Error(message);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body))
+    throw new Error(message);
+  return body as Record<string, unknown>;
 }
 function readJob(body: Record<string, unknown>, id?: string): Job {
   if (
@@ -315,16 +343,30 @@ export function CreateFromLink({
       cache: "no-store",
       signal,
     });
-    const body = await response.json();
-    if (response.status === 401) setAuthRequired(true);
+    if (response.status === 401 && !signal?.aborted) setAuthRequired(true);
+    const body = await readResponseObject(
+      response,
+      "Your draft returned an unreadable response. Please retry.",
+    );
     if (!response.ok)
       throw new Error(
-        body.error || "Your draft could not be opened. Please retry.",
+        typeof body.error === "string"
+          ? body.error
+          : "Your draft could not be opened. Please retry.",
       );
     const project = projectSchema.parse(body.project);
-    if (!body.media?.before?.src || !body.media?.after?.src)
+    const media = body.media;
+    if (!media || typeof media !== "object")
       throw new Error("The preview images could not be loaded. Please retry.");
-    return { projectId: id, project, media: body.media } as WebsiteDraft;
+    const mediaObject = media as Record<string, unknown>;
+    if (!isMedia(mediaObject.before) || !isMedia(mediaObject.after))
+      throw new Error("The preview images could not be loaded. Please retry.");
+    if (!signal?.aborted) setAuthRequired(false);
+    return {
+      projectId: id,
+      project,
+      media: mediaObject as WebsiteDraft["media"],
+    };
   }
 
   useEffect(() => {
@@ -471,9 +513,13 @@ export function CreateFromLink({
             cache: "no-store",
           },
         );
-        const body = await response.json();
         if (cancelled) return;
         if (response.status === 401) setAuthRequired(true);
+        const body = await readResponseObject(
+          response,
+          "The video status response was unreadable. Try checking again.",
+        );
+        if (cancelled) return;
         if (response.status === 404 || response.status === 410) {
           setJob((previous) =>
             previous?.id === id
@@ -481,7 +527,7 @@ export function CreateFromLink({
                   ...previous,
                   status: "failed",
                   error:
-                    body.error ||
+                    (typeof body.error === "string" && body.error) ||
                     "This video is no longer available. Generate it again to continue.",
                 }
               : previous,
@@ -490,9 +536,12 @@ export function CreateFromLink({
         }
         if (!response.ok)
           throw new Error(
-            body.error || "We could not check your video. Try checking again.",
+            typeof body.error === "string"
+              ? body.error
+              : "We could not check your video. Try checking again.",
           );
         const next = readJob(body, id);
+        setAuthRequired(false);
         setJob((previous) =>
           previous?.id === id
             ? { ...previous, ...next, mode: next.mode ?? previous.mode }
@@ -565,7 +614,6 @@ export function CreateFromLink({
           }),
           signal: controller.signal,
         });
-      const body = await response.json();
       if (current !== generation.current || controller.signal.aborted) return;
       if (response.status === 402) setNeedsPlan(true);
       if (response.status === 401) {
@@ -585,6 +633,11 @@ export function CreateFromLink({
           // Same-tab authentication can still restore the session draft.
         }
       }
+      const body = await readResponseObject(
+        response,
+        "The video service returned an unreadable response. Please try again.",
+      );
+      if (current !== generation.current || controller.signal.aborted) return;
       if (!response.ok) {
         if (
           typeof body.projectId === "string" &&
@@ -592,7 +645,9 @@ export function CreateFromLink({
         )
           setSavedProjectId(body.projectId);
         throw new Error(
-          body.error || "Your video could not be started. Please try again.",
+          typeof body.error === "string"
+            ? body.error
+            : "Your video could not be started. Please try again.",
         );
       }
       if (

@@ -361,12 +361,12 @@
     gap: 8px;
   }
   .styleButton strong {
-    font-size: 10px;
-    white-space: nowrap;
+    font-size: 11px;
   }
   .styleButton small {
-    font-size: 4px;
-    letter-spacing: 0.06em;
+    font-size: 9px;
+    line-height: 1.35;
+    letter-spacing: 0.03em;
   }
   .styleIndicator svg {
     width: 10px;

@@ -49,6 +49,14 @@ const graphemes = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 const characters = (text: string) =>
   Array.from(graphemes.segment(text), (part) => part.segment);
 
+/** Show a clean, readable address on the end card across every template. */
+export function displayVideoUrl(value: string) {
+  return value
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+}
+
 /** Real bundled-font advances, including the headline's -0.035em tracking. */
 export function launchTextWidth(
   text: string,

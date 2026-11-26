@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import {
   Monitor,
   Smartphone,
@@ -34,6 +35,7 @@ export function PackagePreview({
   onClose: () => void;
   onEditFraming: () => void;
 }) {
+  const id = useId();
   const hooks = launchHooks(project);
   return (
     <section className="package-preview" aria-label="Launch package preview">
@@ -73,11 +75,14 @@ export function PackagePreview({
             key={index}
             type="button"
             aria-label={`Preview package hook ${index + 1}`}
+            aria-describedby={`${id}-hook-${index}`}
             aria-pressed={selection.hook === index}
             onClick={() => onChange({ ...selection, hook: index })}
           >
             <small>HOOK 0{index + 1}</small>
-            <span>{hook || "Add an opening in Launch kit"}</span>
+            <span id={`${id}-hook-${index}`}>
+              {hook || "Add an opening in Launch kit"}
+            </span>
           </button>
         ))}
       </div>
