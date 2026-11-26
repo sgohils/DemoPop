@@ -8,47 +8,50 @@ test("a stalled status poll reaches its deadline and retry reconnects to the sam
 }) => {
   let submissions = 0;
   await page.clock.install();
-  await page.addInitScript((statusPath) => {
-    const nativeFetch = window.fetch.bind(window);
-    let polls = 0;
-    (window as Window & { __statusPolls?: number }).__statusPolls = 0;
-    window.fetch = (input, init) => {
-      const url =
-        typeof input === "string"
-          ? input
-          : input instanceof Request
-            ? input.url
-            : "";
-      if (new URL(url, window.location.href).pathname !== statusPath)
-        return nativeFetch(input, init);
-      polls++;
-      (window as Window & { __statusPolls?: number }).__statusPolls = polls;
-      if (polls === 1)
-        return new Promise<Response>((_resolve, reject) => {
-          init?.signal?.addEventListener(
-            "abort",
-            () =>
-              reject(
-                new DOMException("The request was aborted.", "AbortError"),
-              ),
-            { once: true },
-          );
-        });
-      return Promise.resolve(
-        new Response(
-          JSON.stringify({
-            id,
-            mode: "local",
-            status: "completed",
-            progress: 1,
-            videoUrl: "/films/demopop-launch.mp4",
-            downloadUrl: `${endpoint}/download`,
-          }),
-          { headers: { "Content-Type": "application/json" } },
-        ),
-      );
-    };
-  }, endpoint);
+  await page.addInitScript(
+    ({ statusPath, jobId }) => {
+      const nativeFetch = window.fetch.bind(window);
+      let polls = 0;
+      (window as Window & { __statusPolls?: number }).__statusPolls = 0;
+      window.fetch = (input, init) => {
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof Request
+              ? input.url
+              : "";
+        if (new URL(url, window.location.href).pathname !== statusPath)
+          return nativeFetch(input, init);
+        polls++;
+        (window as Window & { __statusPolls?: number }).__statusPolls = polls;
+        if (polls === 1)
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener(
+              "abort",
+              () =>
+                reject(
+                  new DOMException("The request was aborted.", "AbortError"),
+                ),
+              { once: true },
+            );
+          });
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: jobId,
+              mode: "local",
+              status: "completed",
+              progress: 1,
+              videoUrl: "/films/demopop-launch.mp4",
+              downloadUrl: `${statusPath}/download`,
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      };
+    },
+    { statusPath: endpoint, jobId: id },
+  );
   await page.route("**/api/create-from-link", (route) => {
     submissions++;
     return route.fulfill({
