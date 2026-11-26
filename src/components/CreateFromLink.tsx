@@ -454,9 +454,16 @@ export function CreateFromLink({
     const id = jobId;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let requestTimeout: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     const controller = new AbortController();
     const poll = async () => {
       try {
+        timedOut = false;
+        requestTimeout = setTimeout(() => {
+          timedOut = true;
+          controller.abort();
+        }, 15_000);
         const response = await fetch(
           `/api/create-from-link/${encodeURIComponent(id)}`,
           {
@@ -494,8 +501,14 @@ export function CreateFromLink({
         setPollError("");
         if (active(next.status)) timer = setTimeout(poll, 1800);
       } catch (cause) {
-        if (!cancelled && !controller.signal.aborted)
-          setPollError(message(cause));
+        if (!cancelled)
+          setPollError(
+            timedOut
+              ? "Checking your video took too long. Try again to reconnect."
+              : message(cause),
+          );
+      } finally {
+        clearTimeout(requestTimeout);
       }
     };
     void poll();
@@ -503,6 +516,7 @@ export function CreateFromLink({
       cancelled = true;
       controller.abort();
       clearTimeout(timer);
+      clearTimeout(requestTimeout);
     };
     // Continue polling through status changes without restarting in-flight requests.
   }, [jobId, isJobActive, pollAttempt]);
