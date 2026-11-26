@@ -203,10 +203,7 @@ test("the opening expands into a cinema view and chapter controls follow native 
   await page.screenshot({
     path: "out/qa/immersive-scroll/desktop-opening.png",
   });
-  const create = hero.getByRole("link", {
-    name: "Create from a website",
-    exact: true,
-  });
+  const create = hero.locator('a[href="/create"]');
   const watch = page.getByRole("button", {
     name: "Watch the film",
     exact: true,
@@ -798,6 +795,25 @@ test("mobile gallery format controls stay easy to tap and expose their selection
     await expect(landscape).toHaveAttribute("aria-pressed", "false");
     await landscape.click();
   }
+});
+
+test("gallery format controls switch with arrow keys and keep focus on the choice", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await page.locator("#styles").scrollIntoViewIfNeeded();
+  const group = page.getByRole("group", { name: "Sample video format" });
+  const portrait = group.getByRole("button", { name: "Portrait sample" });
+  const landscape = group.getByRole("button", { name: "Landscape sample" });
+
+  await landscape.focus();
+  await page.keyboard.press("ArrowLeft");
+  await expect(portrait).toBeFocused();
+  await expect(portrait).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("ArrowRight");
+  await expect(landscape).toBeFocused();
+  await expect(landscape).toHaveAttribute("aria-pressed", "true");
 });
 
 test("launch package demos load on demand, switch hooks with the keyboard, and pause offscreen", async ({
