@@ -17,6 +17,7 @@ import {
 } from "../shared/project";
 import { highlightGeometry, revealColors } from "../shared/video-style";
 import { fitStudioText, splitPanelGeometry } from "./studio-layout";
+import { displayVideoUrl } from "./launch-motion";
 import { VideoFont } from "./VideoFont";
 
 const transition = (frame: number, start: number, end: number) =>
@@ -64,7 +65,13 @@ export function StudioReveal({ project: p, before, after, logo }: VideoProps) {
     wide ? 116 : 112,
     1.08,
   );
-  const url = fitStudioText(p.url, wide ? 1450 : 780, 140, 38, 1.2);
+  const url = fitStudioText(
+    displayVideoUrl(p.url),
+    wide ? 1450 : 780,
+    140,
+    38,
+    1.2,
+  );
   const shot = (
     media: Media,
     crop: ProjectInput["afterCrop"],

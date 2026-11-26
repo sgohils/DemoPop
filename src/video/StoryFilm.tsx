@@ -21,7 +21,7 @@ import {
   clipPlaybackFrames,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
-import { launchAccent, fitLaunchText } from "./launch-motion";
+import { launchAccent, fitLaunchText, displayVideoUrl } from "./launch-motion";
 import { storyOpeningShotBox } from "./story-layout";
 import { VideoFont } from "./VideoFont";
 
@@ -368,7 +368,7 @@ export function StoryFilm({
             style={{ color: "#b9bfce", marginTop: 44 }}
           />
           <Copy
-            text={p.url.replace(/^https?:\/\//, "").replace(/\/$/, "")}
+            text={displayVideoUrl(p.url)}
             width={width - margin * 2}
             height={100}
             size={32}
