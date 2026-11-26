@@ -11,11 +11,13 @@ import {
 import type { CSSProperties } from "react";
 import {
   FONTS,
+  VIDEO,
   coverGeometry,
   type Media,
   type VideoProps,
   type ProjectInput,
   resolveStoryMedia,
+  hasUsableClipTrim,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
 import { launchAccent, fitLaunchText } from "./launch-motion";
@@ -151,23 +153,18 @@ export function StoryFilm({
   const margin = wide ? 96 : 72;
   const accent = launchAccent(p.color);
   const timeline = storyTimeline(p);
-  const missingAssets = [
-    ...new Set(
-      timeline.beats
-        .filter(
-          (beat) =>
-            !resolveStoryMedia(
-              beat.asset,
-              p.before,
-              p.after,
-              before,
-              after,
-              sceneMedia,
-            ),
-        )
-        .map((beat) => beat.asset),
-    ),
-  ];
+  const unresolvedScenes = timeline.beats.filter((beat) => {
+    const media = resolveStoryMedia(
+      beat.asset,
+      p.before,
+      p.after,
+      before,
+      after,
+      sceneMedia,
+    );
+    return !media || !hasUsableClipTrim(media, beat.trimStart, VIDEO.fps);
+  });
+  if (unresolvedScenes.length > 0) fail();
   const resolve = (id: string) => {
     const media = resolveStoryMedia(
       id,
@@ -233,7 +230,7 @@ export function StoryFilm({
       }}
     >
       <VideoFont key={p.font} font={p.font} />
-      {missingAssets.length > 0 && (
+      {unresolvedScenes.length > 0 && (
         <div
           role="alert"
           style={{
@@ -254,9 +251,10 @@ export function StoryFilm({
           }}
         >
           <strong style={{ display: "block", marginBottom: 5 }}>
-            This film is missing a scene asset.
+            Some scene media needs attention.
           </strong>
-          Refresh the scene media before previewing or exporting.
+          Restore missing media or move each clip start before its end, then
+          preview again.
         </div>
       )}
       <AbsoluteFill

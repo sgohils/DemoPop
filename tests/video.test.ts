@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { coverGeometry, resolveStoryMedia } from "../src/shared/project";
+import {
+  coverGeometry,
+  hasUsableClipTrim,
+  resolveStoryMedia,
+} from "../src/shared/project";
 import {
   contrastRatio,
   highlightGeometry,
@@ -67,6 +71,21 @@ test("story scenes never silently render a different screenshot for a missing as
     ),
     null,
   );
+});
+
+test("clip trims preserve at least one frame of verified footage", () => {
+  const clip = {
+    src: "clip.mp4",
+    width: 640,
+    height: 360,
+    duration: 1,
+    kind: "video" as const,
+  };
+  assert.equal(hasUsableClipTrim(clip, 0), true);
+  assert.equal(hasUsableClipTrim(clip, 29 / 30), true);
+  assert.equal(hasUsableClipTrim(clip, 1), false);
+  assert.equal(hasUsableClipTrim({ ...clip, duration: undefined }, 0), false);
+  assert.equal(hasUsableClipTrim({ ...clip, kind: undefined }, 900, 30), true);
 });
 
 test("brand text stays readable for light, dark and saturated colors", () => {

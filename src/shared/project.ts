@@ -189,6 +189,21 @@ export function resolveStoryMedia(
   if (assetId === afterId) return after;
   return null;
 }
+export function hasUsableClipTrim(
+  media: Media,
+  trimStart: number,
+  fps = VIDEO.fps,
+) {
+  return (
+    media.kind !== "video" ||
+    (Number.isFinite(media.duration) &&
+      Number.isFinite(trimStart) &&
+      Number.isFinite(fps) &&
+      fps > 0 &&
+      trimStart >= 0 &&
+      (media.duration! - trimStart) * fps >= 1 - 1e-9)
+  );
+}
 export function projectAssetIds(project: ProjectInput) {
   return [
     ...new Set(
