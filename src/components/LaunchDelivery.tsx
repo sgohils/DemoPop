@@ -43,6 +43,8 @@ export function LaunchDelivery({
     [agency, setAgency] = useState(project.client || project.name),
     [download, setDownload] = useState(true),
     [reviews, setReviews] = useState<Review[]>([]),
+    [reviewLoading, setReviewLoading] = useState(false),
+    [reviewLoadError, setReviewLoadError] = useState(""),
     [working, setWorking] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -53,7 +55,9 @@ export function LaunchDelivery({
     setReviews([]);
     setJobs([]);
     setJobId("");
+    setReviewLoadError("");
     if (!authorized || !projectId || !reviewOpen) return;
+    setReviewLoading(true);
     void Promise.all(
       [
         fetch(`/api/projects/${projectId}/exports`, { cache: "no-store" }),
@@ -80,7 +84,10 @@ export function LaunchDelivery({
         }
       })
       .catch((error) => {
-        if (live) setError(error.message);
+        if (live) setReviewLoadError(error.message);
+      })
+      .finally(() => {
+        if (live) setReviewLoading(false);
       });
     return () => {
       live = false;
@@ -235,11 +242,6 @@ export function LaunchDelivery({
           )}{" "}
           Create review link
         </button>
-        {!jobs.length && (
-          <p className="section-hint">
-            Finish an export to create its review link.
-          </p>
-        )}
         {error && (
           <p className="error" role="alert">
             {error}
@@ -251,7 +253,39 @@ export function LaunchDelivery({
           </p>
         )}
         <div className="review-links">
-          {reviews
+          {reviewLoading ? (
+            <p className="section-hint" role="status">
+              <Loader2 size={14} className="spin" aria-hidden="true" />
+              Loading completed exports and review links…
+            </p>
+          ) : reviewLoadError ? (
+            <div role="alert">
+              <p className="error">
+                Could not load review links: {reviewLoadError}
+              </p>
+              <button
+                type="button"
+                className="button secondary small"
+                onClick={() => setReload((value) => value + 1)}
+              >
+                <Link2 size={14} /> Try again
+              </button>
+            </div>
+          ) : !authorized || !projectId ? (
+            <p className="section-hint" role="status">
+              Sign in and save this project to manage client review links.
+            </p>
+          ) : jobs.length === 0 ? (
+            <p className="section-hint" role="status">
+              Complete an export before creating a client review link.
+            </p>
+          ) : reviews.every((review) => review.revoked_at) ? (
+            <p className="section-hint" role="status">
+              No active review links yet. Create one for a completed export
+              above.
+            </p>
+          ) : null}
+          {!reviewLoading && !reviewLoadError && reviews
             .filter((review) => !review.revoked_at)
             .map((review) => (
               <article key={review.id}>
