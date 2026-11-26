@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import {
   delayRender,
   continueRender,
-  cancelRender,
   staticFile,
 } from "remotion";
 import { FONTS, type ProjectInput } from "../shared/project";
@@ -23,8 +22,9 @@ export function VideoFont({ font: key }: { font: ProjectInput["font"] }) {
         continueRender(handle);
       })
       .catch(() => {
-        if (active)
-          cancelRender(new Error("The bundled video font could not load."));
+        // The composition always declares a system fallback in its font
+        // stack. A missing optional local font should not strand an export.
+        if (active) continueRender(handle);
       });
     return () => {
       active = false;
