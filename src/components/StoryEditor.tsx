@@ -40,7 +40,8 @@ export function StoryEditor({
   onSeek: (frame: number) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [announcement, setAnnouncement] = useState("");
   const story = project.story;
   const timeline = storyTimeline(project);
   const edit = (
@@ -88,6 +89,23 @@ export function StoryEditor({
         : "Square";
   return (
     <div className="story-builder">
+      <span
+        role="status"
+        aria-live="polite"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {announcement}
+      </span>
       <div className="kit-segment" role="group" aria-label="Story structure">
         <button
           type="button"
@@ -177,6 +195,9 @@ export function StoryEditor({
                             scenes[index - 1],
                           ];
                           onChange({ ...story, scenes });
+                          setAnnouncement(
+                            `Scene ${index + 1} moved to position ${index} of ${scenes.length}.`,
+                          );
                         }}
                       >
                         <ArrowUp size={14} />
@@ -192,6 +213,9 @@ export function StoryEditor({
                             scenes[index + 1],
                           ];
                           onChange({ ...story, scenes });
+                          setAnnouncement(
+                            `Scene ${index + 1} moved to position ${index + 2} of ${scenes.length}.`,
+                          );
                         }}
                       >
                         <ArrowDown size={14} />
