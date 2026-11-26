@@ -513,9 +513,13 @@ export function CreateFromLink({
             cache: "no-store",
           },
         );
-        const body = await response.json();
         if (cancelled) return;
         if (response.status === 401) setAuthRequired(true);
+        const body = await readResponseObject(
+          response,
+          "The video status response was unreadable. Try checking again.",
+        );
+        if (cancelled) return;
         if (response.status === 404 || response.status === 410) {
           setJob((previous) =>
             previous?.id === id
@@ -523,7 +527,7 @@ export function CreateFromLink({
                   ...previous,
                   status: "failed",
                   error:
-                    body.error ||
+                    (typeof body.error === "string" && body.error) ||
                     "This video is no longer available. Generate it again to continue.",
                 }
               : previous,
@@ -532,9 +536,12 @@ export function CreateFromLink({
         }
         if (!response.ok)
           throw new Error(
-            body.error || "We could not check your video. Try checking again.",
+            typeof body.error === "string"
+              ? body.error
+              : "We could not check your video. Try checking again.",
           );
         const next = readJob(body, id);
+        setAuthRequired(false);
         setJob((previous) =>
           previous?.id === id
             ? { ...previous, ...next, mode: next.mode ?? previous.mode }
