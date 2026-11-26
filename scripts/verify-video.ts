@@ -1,17 +1,29 @@
 import { getVideoMetadata, RenderInternals } from "@remotion/renderer";
 import { execFileSync } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import assert from "node:assert/strict";
+import {
+  projectSchema,
+  sampleProject,
+  videoSettings,
+} from "../src/shared/project";
+
+const project = process.env.SAMPLE_OVERRIDE
+  ? projectSchema.parse(
+      JSON.parse(await readFile(process.env.SAMPLE_OVERRIDE, "utf8")),
+    )
+  : sampleProject;
 const file = path.resolve(
   process.env.SAMPLE_OUTPUT || "out/demopop-sample.mp4",
 );
 const metadata = await getVideoMetadata(file);
+const expected = videoSettings(project);
 console.log(JSON.stringify(metadata, null, 2));
-assert.equal(metadata.width, 1080);
-assert.equal(metadata.height, 1920);
-assert.equal(metadata.fps, 30);
+assert.equal(metadata.width, expected.width);
+assert.equal(metadata.height, expected.height);
+assert.equal(metadata.fps, expected.fps);
 assert.equal(metadata.codec, "h264");
 assert.equal(metadata.pixelFormat, "yuv420p");
 assert.ok(Math.abs(metadata.durationInSeconds! - 15) < 0.1);
@@ -30,6 +42,8 @@ const ffmpeg = RenderInternals.getExecutablePath({
 });
 const times = [1, 3, 5.7, 6.4, 8, 10.5, 13.5];
 const tiles = [];
+const tileHeight = 480;
+const tileWidth = Math.round(tileHeight * (metadata.width / metadata.height));
 for (const [index, time] of times.entries()) {
   const frame = path.resolve(qa, `frame-${time}.png`);
   execFileSync(ffmpeg, [
@@ -45,13 +59,16 @@ for (const [index, time] of times.entries()) {
     "1",
     frame,
   ]);
-  const tile = await sharp(frame).resize(270, 480).png().toBuffer();
-  tiles.push({ input: tile, left: index * 270, top: 0 });
+  const tile = await sharp(frame)
+    .resize(tileWidth, tileHeight)
+    .png()
+    .toBuffer();
+  tiles.push({ input: tile, left: index * tileWidth, top: 0 });
 }
 await sharp({
   create: {
-    width: times.length * 270,
-    height: 480,
+    width: times.length * tileWidth,
+    height: tileHeight,
     channels: 3,
     background: "#ddd",
   },
