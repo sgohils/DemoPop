@@ -151,6 +151,23 @@ export function StoryFilm({
   const margin = wide ? 96 : 72;
   const accent = launchAccent(p.color);
   const timeline = storyTimeline(p);
+  const missingAssets = [
+    ...new Set(
+      timeline.beats
+        .filter(
+          (beat) =>
+            !resolveStoryMedia(
+              beat.asset,
+              p.before,
+              p.after,
+              before,
+              after,
+              sceneMedia,
+            ),
+        )
+        .map((beat) => beat.asset),
+    ),
+  ];
   const resolve = (id: string) => {
     const media = resolveStoryMedia(
       id,
@@ -216,6 +233,32 @@ export function StoryFilm({
       }}
     >
       <VideoFont key={p.font} font={p.font} />
+      {missingAssets.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            position: "absolute",
+            zIndex: 100,
+            top: 104,
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: `min(${width - margin * 2}px, 720px)`,
+            padding: "18px 22px",
+            border: "1px solid #ffb4a6",
+            borderRadius: 12,
+            background: "#351b20f2",
+            color: "#fff4f1",
+            fontSize: 20,
+            lineHeight: 1.4,
+            boxShadow: "0 14px 44px #0008",
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: 5 }}>
+            This film is missing a scene asset.
+          </strong>
+          Refresh the scene media before previewing or exporting.
+        </div>
+      )}
       <AbsoluteFill
         style={{
           background: `radial-gradient(ellipse at 90% 100%, ${p.color}28, transparent 60%), linear-gradient(145deg,#171b29,transparent 65%)`,
