@@ -332,6 +332,16 @@ export function LaunchScroll() {
       surface.style.setProperty("--echo-y", `${70 - 140 * amount}px`);
       surface.style.setProperty("--ambient-x", `${-4 + 8 * amount}%`);
       surface.dataset.immersion = immersion.toFixed(3);
+      const interactive = copyOpacity > 0.1;
+      if (
+        !interactive &&
+        copyInteractive !== false &&
+        introLinks.some((link) => link === document.activeElement)
+      ) {
+        // A fast scroll can hide the intro in this frame. Transfer focus
+        // before the browser moves it away from the hidden link.
+        watchButton.current?.focus({ preventScroll: true });
+      }
       surface.style.setProperty("--copy-opacity", `${copyOpacity}`);
       surface.style.setProperty(
         "--copy-visibility",
@@ -343,7 +353,6 @@ export function LaunchScroll() {
         "--chapter-y",
         `${20 * (1 - chapterEntrance)}px`,
       );
-      const interactive = copyOpacity > 0.1;
       if (interactive !== copyInteractive) {
         copyInteractive = interactive;
         surface.style.setProperty(
@@ -353,12 +362,6 @@ export function LaunchScroll() {
         introLinks.forEach((link) => {
           link.tabIndex = interactive ? 0 : -1;
         });
-        if (
-          !interactive &&
-          introLinks.some((link) => link === document.activeElement)
-        ) {
-          watchButton.current?.focus({ preventScroll: true });
-        }
       }
       surface.style.setProperty("--ambient", `${0.2 + 0.8 * eased}`);
       surface.dataset.scrollProgress = amount.toFixed(3);

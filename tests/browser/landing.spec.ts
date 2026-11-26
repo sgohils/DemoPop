@@ -209,6 +209,7 @@ test("the opening expands into a cinema view and chapter controls follow native 
     exact: true,
   });
   await create.focus();
+  await expect(create).toBeFocused();
   const heroStart = await hero.evaluate(
     (element) => element.getBoundingClientRect().top + scrollY,
   );
