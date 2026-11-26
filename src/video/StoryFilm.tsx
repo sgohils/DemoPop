@@ -15,6 +15,7 @@ import {
   type Media,
   type VideoProps,
   type ProjectInput,
+  resolveStoryMedia,
 } from "../shared/project";
 import { storyTimeline } from "../shared/launch-kit";
 import { launchAccent, fitLaunchText } from "./launch-motion";
@@ -150,8 +151,21 @@ export function StoryFilm({
   const margin = wide ? 96 : 72;
   const accent = launchAccent(p.color);
   const timeline = storyTimeline(p);
-  const resolve = (id: string) =>
-    sceneMedia[id] ?? (id === p.before ? before : after);
+  const resolve = (id: string) => {
+    const media = resolveStoryMedia(
+      id,
+      p.before,
+      p.after,
+      before,
+      after,
+      sceneMedia,
+    );
+    if (!media) {
+      fail();
+      return after;
+    }
+    return media;
+  };
   const header = (
     <div
       style={{

@@ -176,6 +176,19 @@ export type VideoProps = {
   logo: Media | null;
   sceneMedia?: Record<string, Media>;
 };
+export function resolveStoryMedia(
+  assetId: string,
+  beforeId: string,
+  afterId: string,
+  before: Media,
+  after: Media,
+  sceneMedia: Record<string, Media>,
+): Media | null {
+  if (sceneMedia[assetId]) return sceneMedia[assetId];
+  if (assetId === beforeId) return before;
+  if (assetId === afterId) return after;
+  return null;
+}
 export function projectAssetIds(project: ProjectInput) {
   return [
     ...new Set(
