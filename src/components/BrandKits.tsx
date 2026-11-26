@@ -21,7 +21,11 @@ export function BrandKits({
     [message, setMessage] = useState("");
   const [revision, setRevision] = useState(0);
   useEffect(() => {
-    if (!authorized) return;
+    if (!authorized) {
+      setKits([]);
+      setSelected("");
+      return;
+    }
     let live = true;
     fetch("/api/brand-kits", { cache: "no-store" })
       .then(async (response) => {
@@ -111,12 +115,12 @@ export function BrandKits({
       <label className="field">
         <span>Saved brand kit</span>
         <select
-          value={selected}
+          value={authorized ? selected : ""}
           onChange={(event) => void apply(event.target.value)}
           disabled={!authorized || busy}
         >
           <option value="">Choose a brand kit</option>
-          {kits.map((kit) => (
+          {(authorized ? kits : []).map((kit) => (
             <option key={kit.id} value={kit.id}>
               {kit.name}
             </option>
