@@ -52,6 +52,7 @@ export function LaunchDelivery({
     let live = true;
     setReviews([]);
     setJobs([]);
+    setJobId("");
     if (!authorized || !projectId || !reviewOpen) return;
     void Promise.all(
       [
@@ -65,11 +66,15 @@ export function LaunchDelivery({
     )
       .then(([exports, links]) => {
         if (live) {
-          setJobs(
-            exports.jobs.filter(
-              (job: HistoryJob) =>
-                job.status === "completed" && !job.output_expired_at,
-            ),
+          const availableJobs = exports.jobs.filter(
+            (job: HistoryJob) =>
+              job.status === "completed" && !job.output_expired_at,
+          );
+          setJobs(availableJobs);
+          setJobId((current) =>
+            availableJobs.some((job: HistoryJob) => job.id === current)
+              ? current
+              : (availableJobs[0]?.id ?? ""),
           );
           setReviews(links.reviews);
         }
@@ -91,7 +96,9 @@ export function LaunchDelivery({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          jobId: jobId || jobs[0]?.id,
+          jobId: jobs.some((job) => job.id === jobId)
+            ? jobId
+            : jobs[0]?.id,
           agencyName: agency,
           allowDownload: download,
         }),
