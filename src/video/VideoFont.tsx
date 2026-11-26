@@ -18,12 +18,14 @@ export function VideoFont({ font: key }: { font: ProjectInput["font"] }) {
     face
       .load()
       .then((loaded) => {
+        if (!active) return;
         document.fonts.add(loaded);
-        if (active) continueRender(handle);
+        continueRender(handle);
       })
-      .catch(() =>
-        cancelRender(new Error("The bundled video font could not load.")),
-      );
+      .catch(() => {
+        if (active)
+          cancelRender(new Error("The bundled video font could not load."));
+      });
     return () => {
       active = false;
       continueRender(handle);
