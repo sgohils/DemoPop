@@ -5,9 +5,11 @@ import {
   makeCancelSignal,
 } from "@remotion/renderer";
 import path from "node:path";
+import { cpus } from "node:os";
 import type { VideoProps } from "../src/shared/project";
 import { createBundleCache } from "./bundle-cache";
 import { prepareVideoMedia } from "./private-clips";
+import { resolveRenderConcurrency } from "./render-config";
 
 const cache = createBundleCache((outDir) =>
   bundle({
@@ -43,7 +45,10 @@ export async function renderVideo(
       colorSpace: "bt709",
       imageFormat: "png",
       crf: 18,
-      concurrency: Number(process.env.RENDER_CONCURRENCY || 2),
+      concurrency: resolveRenderConcurrency(
+        process.env.RENDER_CONCURRENCY,
+        cpus().length,
+      ),
       chromiumOptions: { enableMultiProcessOnLinux: true },
       onProgress: ({ progress }) => onProgress(progress),
       cancelSignal: cancel,

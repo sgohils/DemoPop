@@ -15,10 +15,13 @@ function Root() {
       id="Reveal"
       component={Showcase}
       {...VIDEO}
-      calculateMetadata={({ props }) => ({
-        ...videoSettings(projectSchema.parse(props.project)),
-        props: { ...props, project: projectSchema.parse(props.project) },
-      })}
+      calculateMetadata={({ props }) => {
+        const project = projectSchema.parse(props.project);
+        return {
+          ...videoSettings(project),
+          props: { ...props, project },
+        };
+      }}
       defaultProps={{
         project: launchProject,
         before: {
