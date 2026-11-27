@@ -23,8 +23,9 @@
 }
 .header nav {
   display: flex;
-  gap: 26px;
-  font-size: 12px;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
 }
 .header a,
 .footer a {
@@ -32,13 +33,25 @@
   align-items: center;
   gap: 8px;
 }
+.header nav a {
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: #d6d9df;
+  text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.header nav a:hover {
+  color: #f5f4f0;
+  background: #ffffff12;
+}
 .main {
   width: min(1100px, 90%);
   margin: auto;
   padding: 82px 0 100px;
 }
 .intro {
-  margin-bottom: 58px;
+  margin-bottom: clamp(38px, 5vw, 58px);
   text-align: center;
 }
 .eyebrow {
@@ -239,22 +252,39 @@
 }
 .page a:focus-visible,
 .page button:focus-visible {
-  outline: 3px solid #899bff;
-  outline-offset: 5px;
+  outline: 3px solid #a9b6ff;
+  outline-offset: 3px;
+  position: relative;
+  z-index: 1;
 }
 @media (max-width: 650px) {
   .header {
-    align-items: flex-start;
-    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    padding: 12px clamp(12px, 4vw, 20px);
   }
   .header nav {
-    justify-content: flex-end;
-    gap: 14px;
-    flex-wrap: wrap;
-    font-size: 11px;
+    width: 100%;
+    justify-content: space-between;
+    gap: 2px;
+    font-size: 13px;
+  }
+  .header nav a {
+    min-height: 42px;
+    padding: 0 8px;
+    white-space: nowrap;
   }
   .main {
     padding-top: 55px;
+    width: min(92%, 1100px);
+  }
+  .intro > p:last-child {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+  .intro > p:last-child br {
+    display: none;
   }
   .accountGrid {
     grid-template-columns: 1fr;
@@ -262,4 +292,11 @@
   .footer {
     flex-direction: column;
   }
+}
+
+@media (max-width: 360px) {
+  .header nav { font-size: 12px; }
+  .header nav a { padding: 0 6px; }
+  .main { width: calc(100% - 28px); }
+  .intro h1 { font-size: clamp(38px, 12vw, 44px); }
 }
