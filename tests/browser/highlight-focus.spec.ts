@@ -102,6 +102,63 @@ test("each launch highlight keeps its own framing through history, drafts and im
   expect(errors).toEqual([]);
 });
 
+test("keyboard framing changes keep the launch preview on the focused highlight", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/editor/new");
+  const first = page.getByRole("group", {
+    name: "Highlight 01 framing",
+    exact: true,
+  });
+  await first.getByRole("button", { name: "Custom", exact: true }).click();
+
+  const horizontal = first.getByRole("slider", {
+    name: "Highlight 01 horizontal position",
+    exact: true,
+  });
+  await horizontal.focus();
+  await expect(horizontal).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(horizontal).toHaveValue("0.51");
+  await expect(horizontal).toHaveAttribute("aria-valuetext", "51 percent");
+  await expect(
+    first.getByRole("img", {
+      name: "First highlight selected screenshot area",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("slider", { name: "Video position", exact: true }),
+  ).toHaveValue("217");
+  await expect(horizontal).toBeFocused();
+
+  const vertical = first.getByRole("slider", {
+    name: "Highlight 01 vertical position",
+    exact: true,
+  });
+  await vertical.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(vertical).toHaveValue("0.51");
+  await expect(vertical).toBeFocused();
+
+  const zoom = first.getByRole("slider", {
+    name: "Highlight 01 zoom",
+    exact: true,
+  });
+  await zoom.focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(zoom).toHaveValue("1.01");
+  await expect(zoom).toBeFocused();
+  await expect(
+    first.getByRole("img", {
+      name: "First highlight selected screenshot area",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("slider", { name: "Video position", exact: true }),
+  ).toHaveValue("217");
+});
+
 test("custom launch framing remains usable on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/editor/new");
