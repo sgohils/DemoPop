@@ -44,8 +44,10 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         typeof window.IntersectionObserver !== "function"
       ) {
         nodes.forEach((node) => {
-          node.dataset.seen = "true";
-          node.dataset.active = "false";
+          if (node.hasAttribute("data-reveal")) node.dataset.seen = "true";
+          if (node.hasAttribute("data-animate")) {
+            node.dataset.active = "false";
+          }
         });
         return;
       }
@@ -53,13 +55,26 @@ export function LandingMotion({ children }: { children: ReactNode }) {
         (entries) => {
           for (const entry of entries) {
             const node = entry.target as HTMLElement;
-            if (entry.isIntersecting) node.dataset.seen = "true";
-            node.dataset.active = String(entry.isIntersecting);
+            const revealOnly =
+              node.hasAttribute("data-reveal") &&
+              !node.hasAttribute("data-animate");
+
+            if (node.hasAttribute("data-reveal") && entry.isIntersecting) {
+              node.dataset.seen = "true";
+              if (revealOnly) observer?.unobserve(node);
+            }
+            if (node.hasAttribute("data-animate")) {
+              node.dataset.active = String(entry.isIntersecting);
+            }
           }
         },
         { threshold: 0.08, rootMargin: "0px 0px -32px 0px" },
       );
-      nodes.forEach((node) => observer?.observe(node));
+      nodes.forEach((node) => {
+        if (node.hasAttribute("data-reveal") || node.hasAttribute("data-animate")) {
+          observer?.observe(node);
+        }
+      });
     };
     setup();
     reduced.addEventListener("change", setup);
