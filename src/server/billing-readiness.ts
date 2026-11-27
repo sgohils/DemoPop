@@ -200,6 +200,8 @@ export async function billingReadiness(
         "billing_checkouts?select=id,retired_at,return_project_id&limit=0",
         "billing_grants?select=id&limit=0",
         "project_access?select=id&limit=0",
+        "render_jobs?select=id,is_free&limit=0",
+        "free_export_usage?select=id,owner_id,period_start,failed&limit=0",
       ];
       const responses = await Promise.all(
         tables.map((table) =>
@@ -220,15 +222,15 @@ export async function billingReadiness(
         name: "Billing database schema",
         ok: valid,
         detail: valid
-          ? "Billing tables and migration 010 columns reachable with the service role"
-          : "Apply Supabase migrations through 010 and verify service-role access",
+          ? "Billing tables and migration 011 columns reachable with the service role"
+          : "Apply Supabase migrations through 011 and verify service-role access",
       });
     } catch {
       checks.push({
         name: "Billing database schema",
         ok: false,
         detail:
-          "Could not verify Supabase; check the URL, service-role key and migrations through 010",
+          "Could not verify Supabase; check the URL, service-role key and migrations through 011",
       });
     }
   }

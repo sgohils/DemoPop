@@ -28,7 +28,7 @@ const fail = () => {
   try {
     cancelRender(
       new Error(
-        "A story asset could not load. Refresh media access and retry.",
+        "A story image or clip could not be loaded. Refresh its access and try again.",
       ),
     );
   } catch {}

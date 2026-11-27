@@ -134,8 +134,8 @@ export function WebsiteImport({
       {open && (
         <div className="kit-panel-body">
           <p className="section-hint">
-            Capture desktop, a feature detail, and mobile. Review the suggested
-            branding and words before applying them.
+            Capture the desktop page, a feature detail, and the mobile view.
+            Review the suggested branding and captions before using the draft.
           </p>
           <form
             onSubmit={(event) => {

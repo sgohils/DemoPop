@@ -86,7 +86,7 @@ const storySteps = [
   {
     name: "Make it yours.",
     detail:
-      "Build a 3–6 scene story. Set the pace, write your hooks, and bring your own brand.",
+      "Build a story with three to six scenes. Set the pace, write your hooks, and add your branding.",
     number: "02",
     label: "THE CREATIVE DIRECTION",
   },

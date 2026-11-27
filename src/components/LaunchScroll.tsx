@@ -565,8 +565,9 @@ export function LaunchScroll() {
           </h1>
           <div className={styles.introFooter}>
             <p className={styles.description}>
-              Start with your website. Preview a branded launch video before
-              paying, then collect client approval and deliver every format.
+              Start with your website and preview your branded video for free.
+              Export two single videos a month at no cost, or upgrade for a
+              nine-video campaign.
             </p>
             <div className={styles.actions}>
               <Link ref={createButton} href="/create" className={styles.create}>

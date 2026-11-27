@@ -4,7 +4,7 @@ import { NavigationGuard } from "../components/NavigationGuard";
 export const metadata: Metadata = {
   title: "DemoPop — Client websites. Complete launch campaigns.",
   description:
-    "Turn client websites, screenshots, and clips into branded launch campaigns. Export nine-video packages, reuse your brand, and collect client approval in one studio.",
+    "Turn websites, screenshots, and clips into branded launch videos. Start with two free MP4 exports each month, or upgrade for nine-video campaigns.",
 };
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (

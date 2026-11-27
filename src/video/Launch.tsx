@@ -36,7 +36,9 @@ const copyStyle: CSSProperties = {
 const imageFailure = () => {
   try {
     cancelRender(
-      new Error("A video image could not load. Retry image access."),
+      new Error(
+        "A video image could not be loaded. Refresh its access and try again.",
+      ),
     );
   } catch {
     // Remotion records the sanitized error. Its default retry log includes src.

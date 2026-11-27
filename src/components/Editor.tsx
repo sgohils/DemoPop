@@ -650,7 +650,7 @@ export function Editor({
         data.reused
           ? "Showing the existing export with its earlier captured settings. Your submitted settings are saved for your next export."
           : outputKind === "launch-pack"
-            ? "Launch package started: 9 videos, a thumbnail, and manifest. Later edits apply to your next package."
+            ? "Launch package started: 9 videos, a thumbnail, and a manifest. Later edits apply to your next package."
             : "Export started. Later edits apply to your next export.",
       );
     } catch (e) {
@@ -671,7 +671,7 @@ export function Editor({
         file.type,
       )
     )
-      throw new Error("Choose a PNG, JPEG, WebP or H.264 MP4.");
+      throw new Error("Choose a PNG, JPEG, WebP, or H.264 MP4 file.");
     let source: Media, assetId: string;
     if (configured) {
       const response = await fetch("/api/assets", {
@@ -861,6 +861,7 @@ export function Editor({
     if (!job) return;
     const epoch = authEpoch.current;
     setJobError("");
+    setNeedsPlan(false);
     setExporting(true);
     try {
       await api(`jobs/${job.id}/retry`, "POST");
@@ -869,6 +870,7 @@ export function Editor({
       );
     } catch (e) {
       handleAuthFailure(e, epoch);
+      if (e instanceof ApiError && e.status === 402) setNeedsPlan(true);
       setJobError((e as Error).message);
     } finally {
       setExporting(false);
@@ -1137,7 +1139,7 @@ export function Editor({
             }
             title={
               !configured
-                ? "Cloud saving is not connected in this workspace"
+                ? "Account saving is currently unavailable"
                 : undefined
             }
             onClick={save}
@@ -1157,7 +1159,7 @@ export function Editor({
             }
             title={
               !configured
-                ? "MP4 export is not connected in this workspace"
+                ? "Video exports are currently unavailable"
                 : undefined
             }
             onClick={() => void startExport()}
@@ -1351,7 +1353,9 @@ export function Editor({
             <Link href="/create" className="text-link">
               Create a full video from a link <ArrowUpRight size={14} />
             </Link>
-            <p className="section-hint">PNG, JPEG or WebP · up to 10 MB each</p>
+            <p className="section-hint">
+              PNG, JPEG, or WebP · up to 10 MB each
+            </p>
             <div className="assets-grid">
               {assetCard("before")}
               {assetCard("after")}
@@ -1637,8 +1641,8 @@ export function Editor({
             <div className="local-notice">
               <span className="local-tag">PREVIEW MODE</span>
               <span>
-                Drafts stay on this device. Cloud saving and MP4 export aren’t
-                connected.
+                Your draft stays in this browser. Account saving and exports are
+                currently unavailable.
               </span>
               <Link href="/auth" aria-label="Account setup information">
                 <ArrowUpRight size={15} />
@@ -1699,7 +1703,7 @@ export function Editor({
               )}
               <span>
                 {job.status === "queued"
-                  ? "Waiting for a render worker"
+                  ? "Waiting for your export to start"
                   : job.status === "rendering"
                     ? `Rendering · ${Math.floor(job.progress * 100)}%`
                     : job.output_expired_at
@@ -1725,12 +1729,6 @@ export function Editor({
                 sessionVersion.current++;
               }}
             />
-          )}
-          {!configured && (
-            <p className="local-render-tip">
-              Render the original sample locally:{" "}
-              <code>npm run render:sample</code>
-            </p>
           )}
         </main>
       </div>
@@ -1765,7 +1763,7 @@ export function Editor({
             </h2>
             <p>
               {job.status === "queued"
-                ? "Waiting for an available worker. You can keep editing."
+                ? "Waiting to start your export. You can keep editing."
                 : job.status === "rendering"
                   ? job.output_kind === "launch-pack"
                     ? "Rendering 9 launch videos and preparing your ZIP in the background."

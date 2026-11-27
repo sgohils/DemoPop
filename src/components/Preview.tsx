@@ -111,7 +111,7 @@ export function Preview({
             img.onerror = () =>
               reject(
                 new Error(
-                  "A preview image could not load. Retry image access without losing your edits.",
+                  "A preview image could not be loaded. Try again to refresh it; your edits are still here.",
                 ),
               );
             img.src = src;
@@ -224,7 +224,7 @@ export function Preview({
           className="fullscreen"
           disabled={!ready}
           onClick={() => ref.current?.requestFullscreen()}
-          aria-label="Full screen preview"
+          aria-label="Full-screen preview"
         >
           <Maximize size={16} />
         </button>

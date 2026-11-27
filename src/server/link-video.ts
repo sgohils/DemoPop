@@ -97,7 +97,7 @@ export function linkVideoFailure(error: unknown) {
     return linkVideoJson(
       {
         error:
-          "Enter a public website URL and choose a supported video size and duration.",
+          "Enter a public website URL and choose an available video format and length.",
       },
       400,
     );
@@ -115,7 +115,7 @@ export function localLinkVideoAllowed(req: NextRequest) {
   )
     throw new LinkVideoError(
       503,
-      "Connect the account service to create videos from a link.",
+      "Website capture is currently unavailable. You can still use your own screenshots and clips in the studio.",
     );
 }
 
@@ -286,12 +286,15 @@ export async function createCloudLinkVideo(
   },
 ) {
   const owner = await services.owner();
-  if (
-    !request.previewOnly &&
-    billingEnabled() &&
-    (await billingSummary(owner)).remaining < 1
-  )
-    throw new LinkVideoError(402, PAYMENT_REQUIRED);
+  if (!request.previewOnly && billingEnabled()) {
+    const allowance = await billingSummary(owner);
+    if (allowance.remaining < 1 && allowance.free.remaining < 1)
+      throw new LinkVideoError(
+        402,
+        exportBillingError("Free export allowance reached")?.message ||
+          PAYMENT_REQUIRED,
+      );
+  }
   const admin = adminClient();
   const quota = await admin.rpc("consume_request_limit", {
     p_owner: owner,
@@ -302,7 +305,7 @@ export async function createCloudLinkVideo(
   if (quota.error || !quota.data)
     throw new LinkVideoError(
       429,
-      "Your link-to-video limit is reached. Please try again later.",
+      "Your hourly website capture limit has been reached. Please try again later.",
     );
   if (state.cloudCaptures >= 2)
     throw new LinkVideoError(
@@ -394,7 +397,7 @@ export async function createCloudLinkVideo(
       throw new LinkVideoError(
         queued.error.message.includes("Daily") ? 429 : 503,
         queued.error.message.includes("Daily")
-          ? "Your draft was saved. The daily export limit is reached; open it in the editor and export tomorrow."
+          ? "Your draft is saved. Your daily export limit has been reached; open it in the studio and try again tomorrow."
           : "Your draft was saved, but its video could not be queued. Open it in the editor to retry.",
         projectId,
       );

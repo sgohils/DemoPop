@@ -361,7 +361,7 @@ test("a broken private image shows a safe retry and recovers without losing edit
     .getByLabel("Opening caption")
     .fill("Keep this caption while the image recovers.");
   await expect(page.locator(".preview-loading[role='alert']")).toContainText(
-    "A preview image could not load",
+    "A preview image could not be loaded",
   );
   await expect(
     page.getByRole("button", { name: "Play", exact: true }),

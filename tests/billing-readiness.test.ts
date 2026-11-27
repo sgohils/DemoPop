@@ -117,9 +117,11 @@ test("billing doctor checks real catalog shapes, portal restrictions, webhook mo
   };
   const result = await billingReadiness(env, request, fetcher);
   assert.equal(result.ready, true, JSON.stringify(result.checks));
-  assert.equal(queries.length, 4);
+  assert.equal(queries.length, 6);
   assert.ok(queries.some((query) => query.includes("retired_at")));
   assert.ok(queries.some((query) => query.includes("return_project_id")));
+  assert.ok(queries.some((query) => query.includes("is_free")));
+  assert.ok(queries.some((query) => query.includes("free_export_usage")));
   const serialized = JSON.stringify(result);
   for (const value of [
     env.STRIPE_SECRET_KEY,

@@ -10,7 +10,12 @@ export async function localMedia(blob: Blob): Promise<Media> {
       video.muted = true;
       await new Promise<void>((resolve, reject) => {
         const timer = setTimeout(
-          () => reject(new Error("Clip metadata timed out.")),
+          () =>
+            reject(
+              new Error(
+                "The clip took too long to load. Try another MP4 file.",
+              ),
+            ),
           10000,
         );
         video.onloadedmetadata = () => {
@@ -30,7 +35,9 @@ export async function localMedia(blob: Blob): Promise<Media> {
         Math.min(video.videoWidth, video.videoHeight) < 64 ||
         Math.max(video.videoWidth, video.videoHeight) > 4096
       )
-        throw new Error("Use a 0.1–30 second MP4, 64–4096 pixels.");
+        throw new Error(
+          "Use an MP4 clip between 0.1 and 30 seconds long, with each dimension between 64 and 4096 pixels.",
+        );
       const result: Media = {
         src,
         width: video.videoWidth,
@@ -47,7 +54,7 @@ export async function localMedia(blob: Blob): Promise<Media> {
     }
   }
   if (!["image/png", "image/jpeg", "image/webp"].includes(blob.type))
-    throw new Error("Choose a PNG, JPEG, WebP or MP4 file.");
+    throw new Error("Choose a PNG, JPEG, WebP, or MP4 file.");
   const bitmap = await createImageBitmap(blob);
   try {
     if (

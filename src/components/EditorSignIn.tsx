@@ -20,7 +20,7 @@ export function EditorSignIn({ onSignedIn }: { onSignedIn: () => void }) {
       const data = await result.json();
       if (!result.ok || !data.signedIn)
         throw new Error(
-          data.error || "Sign in could not finish. Please retry.",
+          data.error || "We could not sign you in. Please try again.",
         );
       form.reset();
       onSignedIn();

@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-test("pricing explains project access and keeps a usable free preview when purchases are unavailable", async ({
+test("pricing explains the free tier and keeps creation usable when purchases are unavailable", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -10,21 +10,25 @@ test("pricing explains project access and keeps a usable free preview when purch
   await page.screenshot({ path: "out/qa/commercial/home-desktop.png" });
   await page.goto("/pricing");
   await expect(
-    page.getByRole("heading", { name: /A whole launch/ }),
+    page.getByRole("heading", { name: /Your next video/ }),
   ).toBeVisible();
   await expect(page.getByText("$29", { exact: false }).first()).toBeVisible();
   await expect(page.getByText("$79", { exact: false }).first()).toBeVisible();
   await expect(
-    page.getByText(/Paid exports are not available yet/),
+    page.getByText(/Paid packages are not available yet/),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /Start Studio|Get a launch package/ }),
   ).toHaveCount(0);
-  await page
-    .getByRole("link", { name: "Try the free preview" })
-    .first()
-    .click();
-  await expect(page).toHaveURL(/\/editor\/new/);
+  const free = page.getByRole("article").filter({
+    has: page.getByRole("heading", { name: "Free", exact: true }),
+  });
+  await expect(free).toContainText(
+    "2 single-video MP4 exports each calendar month",
+  );
+  await expect(free).toContainText("No credit card required");
+  await free.getByRole("link", { name: "Start free", exact: true }).click();
+  await expect(page).toHaveURL(/\/create/);
   await page.goto("/billing");
   await expect(
     page.getByRole("heading", { name: /Your packages, in one place/ }),

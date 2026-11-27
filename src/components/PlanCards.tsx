@@ -3,7 +3,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowUpRight, Check, Loader2 } from "lucide-react";
-import { OFFERS, type Offer } from "../shared/billing";
+import { FREE_EXPORT_LIMIT, OFFERS, type Offer } from "../shared/billing";
 import { billingPath, pricingPath } from "../shared/billing-context";
 import styles from "./plans.module.css";
 
@@ -56,8 +56,8 @@ export function PlanCards({
     <div className={styles.plans}>
       {!available && (
         <p className={styles.notice}>
-          Paid exports are not available yet. Try the studio with your own media
-          for free.
+          Paid packages are not available yet. You can still get started with
+          the Free plan.
         </p>
       )}
       {error && (
@@ -66,6 +66,45 @@ export function PlanCards({
         </p>
       )}
       <div className={styles.grid}>
+        <article
+          className={`${styles.card} ${styles.free}`}
+          data-selected={selected === "free"}
+        >
+          <div className={styles.cardTop}>
+            <span>YOUR FIRST VIDEOS, ON US</span>
+          </div>
+          <h3>Free</h3>
+          <p className={styles.price}>
+            $0<span>/ month</span>
+          </p>
+          <p className={styles.description}>
+            Make something worth sharing, with no payment details needed.
+          </p>
+          <ul>
+            {[
+              `${FREE_EXPORT_LIMIT} single-video MP4 exports each calendar month`,
+              "Full resolution, no watermark",
+              "All single-video formats, templates & lengths",
+              "Free editing and motion previews",
+              "Use your website, screenshots, or clips",
+            ].map((feature) => (
+              <li key={feature}>
+                <Check size={15} aria-hidden="true" />
+                {feature}
+              </li>
+            ))}
+          </ul>
+          <Link
+            className={`${styles.buy} ${styles.freeButton}`}
+            href={projectId ? `/editor/${projectId}` : "/create"}
+          >
+            Start free <ArrowUpRight size={17} />
+          </Link>
+          <p className={styles.fine}>
+            Sign in to export. Resets on the first of each month at 00:00 UTC;
+            unused exports do not roll over. No credit card required.
+          </p>
+        </article>
         {(Object.keys(OFFERS) as Offer[]).map((offer) => {
           const plan = OFFERS[offer];
           return (
@@ -98,10 +137,10 @@ export function PlanCards({
                 {[
                   offer === "studio"
                     ? "5 new project packages each billing month"
-                    : "1 project package; activate when you need it",
+                    : "1 project package; start when you need it",
                   "3 editable hooks × 3 formats: 9 MP4s",
                   "30 days to revise each activated project",
-                  "Up to 10 exports per project; failed attempts excluded",
+                  "Up to 10 exports per project; failed renders do not count",
                   "Brand kits, recipes & client folders",
                   "Branded review links, comments & approval",
                 ].map((feature) => (
@@ -133,24 +172,24 @@ export function PlanCards({
               ) : (
                 <Link
                   className={styles.buy}
-                  href={projectId ? `/editor/${projectId}` : "/editor/new"}
+                  href={projectId ? `/editor/${projectId}` : "/create"}
                 >
-                  Try the free preview <ArrowUpRight size={17} />
+                  Start free <ArrowUpRight size={17} />
                 </Link>
               )}
               <p className={styles.fine}>
                 {offer === "studio"
                   ? "Renews monthly. Unused monthly packages expire. Cancel future renewals in Billing."
-                  : "No subscription. Your unused package does not expire."}
+                  : "No subscription. Unused packages do not expire; the 30-day revision window starts on the first paid export."}
               </p>
             </article>
           );
         })}
       </div>
       <p className={styles.terms}>
-        Prices in USD. Each export is one MP4 or a complete nine-video ZIP. The
-        same project keeps its access when you revise it. Review links last 14
-        days.{" "}
+        Prices in USD. Free exports are single MP4s. Paid project packages cover
+        single MP4s and complete nine-video ZIPs, with up to 10 exports during
+        each project’s 30-day access window. Review links last 14 days.{" "}
         <Link href="/pricing#details">
           See how packages work <ArrowUpRight size={12} />
         </Link>

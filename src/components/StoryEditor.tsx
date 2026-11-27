@@ -133,7 +133,7 @@ export function StoryEditor({
       </div>
       <p className="section-hint">
         {story
-          ? "Build a real product story with 3–6 screenshots or short clips. Replacing media keeps its caption, framing, and timing."
+          ? "Tell your product’s story with three to six screenshots or short clips. Replacing media keeps its caption, framing, and timing."
           : "A before-and-after reveal. Switch to Product story for multiple features and longer videos."}
       </p>
       {story && (
@@ -242,8 +242,8 @@ export function StoryEditor({
                       30) >
                     4 && (
                     <p className="section-hint">
-                      This caption may read quickly. Shorten the copy or choose
-                      a longer story.
+                      This caption may be hard to read in time. Shorten it or
+                      choose a longer story.
                     </p>
                   )}
                   <div
@@ -348,9 +348,9 @@ export function StoryEditor({
                         ].map((id, option) => (
                           <option key={id} value={id}>
                             {id === project.after
-                              ? "Main after screen"
+                              ? "Main after screenshot"
                               : id === project.before
-                                ? "Main before screen"
+                                ? "Main before screenshot"
                                 : `Uploaded media ${option - 1}`}
                           </option>
                         ))}
@@ -510,8 +510,9 @@ export function StoryEditor({
             <Plus size={14} /> Add scene
           </button>
           <p className="section-hint">
-            PNG, JPEG, WebP or H.264 MP4 · 10 MB each · clips up to 30s. Clip
-            sound is muted; the soundtrack is controlled above.
+            PNG, JPEG, WebP, or H.264 MP4 · up to 10 MB each · clips up to 30
+            seconds. Clip audio is muted; choose your soundtrack in Motion &
+            format.
           </p>
         </>
       )}

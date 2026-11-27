@@ -142,7 +142,8 @@ export function LaunchDelivery({
           <p>
             9 MP4s · 3 hooks × 3 formats
             <br />
-            Landscape, vertical, square + thumbnail and manifest.
+            Landscape, vertical, and square videos, plus a thumbnail and
+            manifest.
           </p>
         </div>
       </div>
@@ -181,11 +182,12 @@ export function LaunchDelivery({
         <Package size={14} /> Export launch package
       </button>
       <p className="section-hint">
-        A ZIP containing every format and opening. Packages use 9 of your daily
-        render allowance.{" "}
+        One ZIP with all nine videos. Requires a paid launch package or Studio
+        plan and counts as one project export. Daily rendering limits also
+        apply.{" "}
         {authorized
           ? "Edits after export apply to your next package."
-          : "Connect your account and export worker to download a package."}
+          : "Sign in to export and download a launch package."}
       </p>
       <hr />
       <details

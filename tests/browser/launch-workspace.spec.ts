@@ -344,7 +344,7 @@ test("public review collects timestamped feedback and approval for the displayed
   await page
     .getByLabel("Comment", { exact: true })
     .fill("Please hold this feature longer.");
-  await page.getByLabel("At second", { exact: true }).fill("6.2");
+  await page.getByLabel("Time in video (seconds)", { exact: true }).fill("6.2");
   await page
     .getByRole("button", { name: "Add timestamped comment", exact: true })
     .click();

@@ -162,7 +162,8 @@ export function BrandKits({
       </div>
       {!authorized && (
         <p className="section-hint">
-          Sign in to reuse colors, a font, your logo, and closing URL.
+          Sign in to save and reuse your colors, font, logo, and closing website
+          address.
         </p>
       )}
       {error && (

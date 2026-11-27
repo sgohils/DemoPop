@@ -1,6 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TEMPLATES } from "../shared/project";
+import { pricingPath } from "../shared/billing-context";
 export type HistoryJob = {
   id: string;
   status: "queued" | "rendering" | "completed" | "failed";
@@ -31,6 +33,7 @@ export function ExportHistory({
     [more, setMore] = useState(false),
     [offset, setOffset] = useState(0);
   const [error, setError] = useState(""),
+    [needsPlan, setNeedsPlan] = useState(false),
     [loading, setLoading] = useState(false),
     [busy, setBusy] = useState<string | null>(null),
     [attempt, setAttempt] = useState(0);
@@ -76,6 +79,7 @@ export function ExportHistory({
   async function action(job: HistoryJob, retry = false) {
     setBusy(job.id);
     setError("");
+    setNeedsPlan(false);
     try {
       const response = await fetch(
         `/api/jobs/${job.id}/${retry ? "retry" : "download"}`,
@@ -83,6 +87,7 @@ export function ExportHistory({
       );
       const body = await response.json();
       if (response.status === 401) onUnauthorized();
+      if (response.status === 402) setNeedsPlan(true);
       if (!response.ok) throw new Error(body.error);
       if (retry) {
         onRetried({ ...job, status: "queued", progress: 0, error: null });
@@ -120,6 +125,14 @@ export function ExportHistory({
       {error && (
         <p className="error" role="alert">
           {error}
+          {needsPlan && (
+            <>
+              {" "}
+              <Link href={pricingPath({ projectId })}>
+                Choose a launch package
+              </Link>
+            </>
+          )}
         </p>
       )}
       {!jobs.length && !loading && !error && (

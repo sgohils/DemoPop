@@ -41,11 +41,11 @@ export function LaunchWorkflow() {
           </span>
           <h3>A link. A complete video.</h3>
           <p>
-            Paste your website link. DemoPop captures the page, builds your
-            branded story, and renders a video with captions and music.
+            Paste a public website link. Review the captured screens and
+            suggested story, then export your video with captions and music.
           </p>
           <Link href="/create" className={styles.createLink}>
-            Create from link <ArrowRight size={14} />
+            Create from a link <ArrowRight size={14} />
           </Link>
         </div>
       </article>

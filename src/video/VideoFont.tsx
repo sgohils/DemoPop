@@ -24,7 +24,7 @@ export function VideoFont({ font: key }: { font: ProjectInput["font"] }) {
       })
       .catch(() => {
         if (active)
-          cancelRender(new Error("The bundled video font could not load."));
+          cancelRender(new Error("The video font could not be loaded."));
       });
     return () => {
       active = false;

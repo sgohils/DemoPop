@@ -77,12 +77,12 @@ export function PackagePreview({
             onClick={() => onChange({ ...selection, hook: index })}
           >
             <small>HOOK 0{index + 1}</small>
-            <span>{hook || "Add an opening in Launch kit"}</span>
+            <span>{hook || "Add an opening in the launch kit"}</span>
           </button>
         ))}
       </div>
       <div className="package-preview-footer">
-        <span>Live preview · No renders used</span>
+        <span>Live preview · Does not use an export</span>
         {project.story && (
           <button type="button" className="text-link" onClick={onEditFraming}>
             <SlidersHorizontal size={13} /> Edit {selection.format} framing

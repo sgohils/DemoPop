@@ -11,7 +11,7 @@ export const cloudConfigured = () =>
 export async function userClient() {
   if (!cloudConfigured())
     throw new Error(
-      "Cloud features need Supabase setup. The local preview and render command are available.",
+      "Account saving and exports are currently unavailable. You can still edit and preview videos in this browser.",
     );
   const jar = await cookies();
   return createServerClient(

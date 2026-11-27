@@ -16,7 +16,7 @@ test("automatic creation and the traditional studio are both directly accessible
   ).toHaveAttribute("href", "/create");
   await page
     .locator("#product")
-    .getByRole("link", { name: "Create from link", exact: true })
+    .getByRole("link", { name: "Create from a link", exact: true })
     .click();
   await expect(page).toHaveURL(/\/create$/);
   await page

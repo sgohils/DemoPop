@@ -4,9 +4,9 @@ import { cloudConfigured } from "../../server/supabase";
 import { billingEnabled } from "../../server/stripe";
 
 export const metadata: Metadata = {
-  title: "Create from link — DemoPop",
+  title: "Create from a link — DemoPop",
   description:
-    "Paste your website link. DemoPop captures your product, builds a branded story, and generates a complete launch video.",
+    "Paste a public website link, review your captured screens and suggested story, then export a branded launch video.",
 };
 
 export default function Page() {

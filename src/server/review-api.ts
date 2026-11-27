@@ -100,7 +100,7 @@ export async function publicReview(req: NextRequest, token: string) {
       .limit(200);
     if (comments.error)
       return NextResponse.json(
-        { error: "Comments could not load. Please retry." },
+        { error: "Comments could not be loaded. Please try again." },
         { status: 503 },
       );
     let downloadUrl: string | null = null;
@@ -135,11 +135,11 @@ export async function publicReview(req: NextRequest, token: string) {
   } catch (error) {
     if (error instanceof z.ZodError)
       return NextResponse.json(
-        { error: "Check your name, comment and video timestamp." },
+        { error: "Check your name, comment, and video timestamp." },
         { status: 400 },
       );
     return NextResponse.json(
-      { error: "This review could not load. Please retry." },
+      { error: "This review could not be loaded. Please try again." },
       { status: 503 },
     );
   }

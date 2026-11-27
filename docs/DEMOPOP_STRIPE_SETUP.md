@@ -5,7 +5,7 @@ DemoPop uses Stripe-hosted Checkout for the $29 one-time launch package and $79/
 ## Local test setup
 
 1. If `.env.local` does not exist, copy `.env.example` to it. Set `STRIPE_SECRET_KEY` to your Stripe **test-mode** secret or restricted key, the three Supabase connection variables, and `APP_ORIGIN=http://127.0.0.1:3001`. Keep credentials in private environment files. Stripe-hosted Checkout does not require a browser publishable key in this integration.
-2. Apply Supabase migrations through `010_checkout_context.sql`. The app requires existing authentication, private storage and the export worker as well as billing tables. Restart the web app and worker after upgrading their source. Supabase's permitted Auth redirects must include the application's `/auth/confirm` callback with encoded local pricing/billing return context, alongside the existing create and password-recovery callbacks.
+2. Apply Supabase migrations through `011_free_tier.sql`. The app requires existing authentication, private storage and the export worker as well as billing tables. The Free plan works without Stripe once these services are configured. Restart the web app and worker after upgrading their source. Supabase's permitted Auth redirects must include the application's `/auth/confirm` callback with encoded local pricing/billing return context, alongside the existing create and password-recovery callbacks.
 3. Run:
 
    ```powershell
@@ -22,8 +22,8 @@ DemoPop uses Stripe-hosted Checkout for the $29 one-time launch package and $79/
 
    Put the listener's signing secret in `STRIPE_WEBHOOK_SECRET` in `.env.local`. Keep the listener running. Its secret differs from a hosted endpoint's signing secret.
 
-5. Run `npm run billing:check`, then restart `npm run preview`. The check reads Stripe prices/portal/endpoint configuration and queries empty Supabase results to verify billing tables and migration 010 columns. It performs no writes or payments and prints no credentials. If a dependency is missing it exits unsuccessfully and identifies the setting. A passed configuration check does not prove webhook delivery or completed payment.
-6. Sign in to DemoPop, save a project, and use its payment prompt to choose a plan. Complete Checkout with a [Stripe test payment method](https://docs.stripe.com/testing). Confirm the package balance at `/billing`, use **Continue to export** to return to the saved project, then explicitly start its export. Also cancel Checkout and confirm that the selected plan and original project remain available. Verify the webhook arrives successfully and that refreshing confirmation or replaying the event does not duplicate access. Open Manage billing & receipts to test the dedicated portal.
+5. Run `npm run billing:check`, then restart `npm run preview`. The check reads Stripe prices/portal/endpoint configuration and queries empty Supabase results to verify billing tables and the current schema through migration 011. It performs no writes or payments and prints no credentials. If a dependency is missing it exits unsuccessfully and identifies the setting. A passed configuration check does not prove webhook delivery or completed payment.
+6. Sign in to DemoPop and verify the two monthly free single-video exports shown at `/billing`. Save a project and request a nine-video launch package to exercise its payment prompt, or choose a paid plan at `/pricing`. Complete Checkout with a [Stripe test payment method](https://docs.stripe.com/testing). Confirm the package balance at `/billing`, use **Continue to export** to return to the saved project, then explicitly start its export. Also cancel Checkout and confirm that the selected plan and original project remain available. Verify the webhook arrives successfully and that refreshing confirmation or replaying the event does not duplicate access. Open Manage billing & receipts to test the dedicated portal.
 
 ## Hosted endpoint and live activation
 

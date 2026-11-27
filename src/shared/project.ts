@@ -18,7 +18,7 @@ export const TEMPLATES = [
   {
     id: "reveal",
     name: "Classic Reveal",
-    description: "A clean wipe and two considered highlights.",
+    description: "A clean wipe followed by two close-up highlights.",
   },
   {
     id: "slide",

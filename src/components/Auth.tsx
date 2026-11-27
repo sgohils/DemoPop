@@ -20,7 +20,7 @@ export function Auth({
   const [message, setMessage] = useState("");
   const [error, setError] = useState(
     confirmationFailed
-      ? "The confirmation link could not be verified. Check that it is current, then try signing in."
+      ? "We could not verify that confirmation link. Open the latest link in your email or try signing in."
       : "",
   );
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -72,7 +72,7 @@ export function Auth({
             <br />
             <em>In the spotlight.</em>
           </h1>
-          <p>Give every redesign a reveal worth sharing.</p>
+          <p>Turn your product into a video worth sharing.</p>
           <div className="auth-art">
             <span>before</span>
             <ArrowRight size={32} />
@@ -90,15 +90,15 @@ export function Auth({
           </h2>
           <p>
             {mode === "recover"
-              ? "Enter your account email to request a password recovery link."
+              ? "Enter your account email to request a password reset link."
               : mode === "login"
                 ? "Sign in to pick up where you left off."
-                : "Create an account to save and export your videos."}
+                : "Create an account to save projects and get two free video exports each month."}
           </p>
           {!configured && (
             <div className="notice">
-              Account features need Supabase setup.{" "}
-              <Link href="/editor/new">Explore the local editor →</Link>
+              Account features are currently unavailable. You can still edit and
+              preview videos. <Link href="/editor/new">Try the studio →</Link>
             </div>
           )}
           <form onSubmit={submit}>
@@ -125,7 +125,11 @@ export function Auth({
                     mode === "login" ? "current-password" : "new-password"
                   }
                   required
-                  placeholder="At least 8 characters"
+                  placeholder={
+                    mode === "signup"
+                      ? "At least 8 characters"
+                      : "Enter your password"
+                  }
                   disabled={!configured}
                 />
               </label>
@@ -144,7 +148,7 @@ export function Auth({
               {busy
                 ? "Please wait…"
                 : mode === "recover"
-                  ? "Send recovery link"
+                  ? "Send reset link"
                   : mode === "login"
                     ? "Sign in"
                     : "Create account"}
@@ -160,11 +164,15 @@ export function Auth({
                 setMessage("");
               }}
             >
-              Forgot password?
+              Forgot your password?
             </button>
           )}
           <p className="auth-switch">
-            {mode === "login" ? "New here?" : "Already have an account?"}{" "}
+            {mode === "recover"
+              ? "Remember your password?"
+              : mode === "login"
+                ? "New here?"
+                : "Already have an account?"}{" "}
             <button
               onClick={() => {
                 setMode(mode === "login" ? "signup" : "login");

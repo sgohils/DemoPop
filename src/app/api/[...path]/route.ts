@@ -68,7 +68,7 @@ async function handle(
     if (!cloudConfigured())
       throw new HttpError(
         503,
-        "Cloud features are unavailable until Supabase is configured. You can edit and preview locally.",
+        "Account saving and exports are currently unavailable. You can still edit and preview videos in this browser.",
       );
     if (req.method !== "GET" && !isSameOriginRequest(req))
       throw new HttpError(403, "Request origin is not allowed.");
@@ -85,11 +85,11 @@ async function handle(
         if (result.error)
           throw new HttpError(
             result.error.status === 429 ? 429 : 503,
-            "A recovery email could not be requested right now. Please try again later.",
+            "We could not request a password reset email right now. Please try again later.",
           );
         return NextResponse.json({
           message:
-            "If an account exists for that email, a recovery link will arrive shortly.",
+            "If an account exists for that email, a password reset link will arrive shortly.",
         });
       }
       if (id === "password") {
@@ -101,13 +101,13 @@ async function handle(
         if (identity.error || !identity.data.user)
           throw new HttpError(
             401,
-            "Open a valid recovery link before changing your password.",
+            "Open a valid password reset link before changing your password.",
           );
         const result = await supabase.auth.updateUser(body);
         if (result.error)
           throw new HttpError(
             400,
-            "The password could not be updated. Use a fresh recovery link and try again.",
+            "Your password could not be updated. Request a new reset link and try again.",
           );
         return NextResponse.json({ ok: true });
       }
@@ -742,11 +742,14 @@ async function handle(
           p_job: jobId,
           p_daily_cap: dailyRenderCap(),
         });
-        if (retried.error)
+        if (retried.error) {
+          const billingError = exportBillingError(retried.error.message);
+          if (billingError) throw billingError;
           throw new HttpError(
             409,
             "This export cannot be retried: it is active, has reached three attempts, or the daily limit was reached.",
           );
+        }
         return NextResponse.json({ id: retried.data });
       }
       if (action === "download" && req.method === "GET") {

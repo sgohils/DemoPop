@@ -187,7 +187,7 @@ export function ReviewPage({ token }: { token: string }) {
                   }}
                   onError={() =>
                     setError(
-                      "Video access could not load. Retry to refresh access.",
+                      "The video could not be loaded. Try again to refresh its playback link.",
                     )
                   }
                 />
@@ -254,7 +254,7 @@ export function ReviewPage({ token }: { token: string }) {
                     />
                   </label>
                   <label className="review-timestamp">
-                    At second
+                    Time in video (seconds)
                     <input
                       type="number"
                       min={0}

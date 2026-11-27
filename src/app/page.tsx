@@ -18,7 +18,7 @@ import styles from "./home.module.css";
 const questions = [
   [
     "What can I make with DemoPop?",
-    "A short reveal or a 15-, 30-, or 60-second product story. Start with your website, screenshots, or MP4 clips, build up to six scenes, and add your own captions, branding, and soundtrack.",
+    "A short reveal or a 15-, 30-, or 60-second product story. Start with your website, screenshots, or MP4 clips, build up to six scenes, and add your captions and branding. Choose the included soundtrack or export without music.",
   ],
   [
     "What’s in a launch package?",
@@ -26,11 +26,11 @@ const questions = [
   ],
   [
     "Do I need an account to try it?",
-    "Preview in the studio with your own media without an account. Website capture, saving, exports, and client review links require an account. Choose a project package or Studio plan for paid exports. Browser drafts and local recipes stay on your device.",
+    "You can edit and preview your own media in the studio without an account. Sign in to capture a website, save projects, and use two free single-video exports each calendar month. No card is required, and exports have no watermark. Choose a paid launch package or Studio for nine-video campaigns and more revisions. Browser drafts and local recipes stay on your device.",
   ],
   [
     "Can I update a video without rebuilding it?",
-    "Yes. Replace a screenshot or clip while keeping its caption, framing, and timing. Save a launch recipe to reuse your story and brand for the next update. Recipe application is undoable.",
+    "Yes. Replace a screenshot or clip while keeping its caption, framing, and timing. Save a launch recipe to reuse your story and brand for the next update. You can undo applying a recipe.",
   ],
   [
     "How do client reviews work?",
@@ -139,7 +139,7 @@ export default function Home() {
                     clips. Shape your product story at 15, 30, or 60 seconds.
                   </p>
                   <Link href="/create" className={styles.productImport}>
-                    Create from link <ArrowUpRight size={15} />
+                    Create from a link <ArrowUpRight size={15} />
                   </Link>
                 </div>
               </div>
@@ -178,7 +178,7 @@ export default function Home() {
               <p>
                 Bold launch. Clean reveal. Quiet confidence.
                 <br />
-                Try the actual renderer. Find your direction.
+                Preview each style. Find your direction.
               </p>
             </div>
             <LandingGallery />
@@ -202,7 +202,7 @@ export default function Home() {
                 <span>starts a little further ahead.</span>
               </h2>
               <p>
-                Reuse your brand and edit for the next client.
+                Reuse your branding and story for the next client.
                 <br />
                 Close the loop with your client.
               </p>
@@ -219,20 +219,20 @@ export default function Home() {
           >
             <div className={styles.sectionTopline}>
               <p className={styles.eyebrow}>
-                <span /> A DELIVERABLE WORTH REPEATING
+                <span /> START FREE. UPGRADE WHEN YOU NEED MORE.
               </p>
               <span className={styles.indexLabel}>05 / PRICING</span>
             </div>
             <div className={styles.campaignHeading}>
               <h2 id="pricing-heading">
-                One launch.
+                Start with Free.
                 <br />
-                <em>Or your next five.</em>
+                <em>Upgrade for more.</em>
               </h2>
               <p>
-                A clear price for the whole client campaign.
+                Two free single-video exports every month.
                 <br />
-                Preview with your own media before you buy.
+                Upgrade for campaign packages and more revisions.
               </p>
             </div>
             <div className={styles.pricingInner}>

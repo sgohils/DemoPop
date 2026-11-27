@@ -1,7 +1,14 @@
 import "server-only";
 import { z } from "zod";
 import { adminClient, cloudConfigured } from "./supabase";
-import { OFFERS, PAYMENT_REQUIRED, type Offer } from "../shared/billing";
+import {
+  FREE_EXPORT_LIMIT,
+  freeExportPeriod,
+  OFFERS,
+  PAYMENT_REQUIRED,
+  type BillingSummary,
+  type Offer,
+} from "../shared/billing";
 import {
   appOrigin,
   billingEnabled,
@@ -143,21 +150,29 @@ export async function recordFunnel(
     /* best effort */
   }
 }
-export async function billingSummary(owner?: string) {
+export async function billingSummary(owner?: string): Promise<BillingSummary> {
+  const period = freeExportPeriod();
   const base = {
     enabled: billingEnabled(),
     available: cloudConfigured() && stripeConfigured(),
     signedIn: Boolean(owner),
     remaining: 0,
+    free: {
+      limit: FREE_EXPORT_LIMIT,
+      used: 0,
+      remaining: FREE_EXPORT_LIMIT,
+      resetsAt: period.resetsAt,
+    },
+    canManageBilling: false,
     subscription: null,
     projects: [],
   };
   if (!owner || !billingEnabled()) return base;
   const db = adminClient();
-  const [account, grants, accesses] = await Promise.all([
+  const [account, grants, accesses, freeUsage] = await Promise.all([
     db
       .from("billing_accounts")
-      .select("subscription_status,cancel_at_period_end")
+      .select("customer_id,subscription_status,cancel_at_period_end")
       .eq("owner_id", owner)
       .maybeSingle(),
     db
@@ -173,13 +188,27 @@ export async function billingSummary(owner?: string) {
       .eq("owner_id", owner)
       .gt("expires_at", new Date().toISOString())
       .order("created_at", { ascending: false }),
+    db
+      .from("free_export_usage")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", owner)
+      .eq("failed", false)
+      .gte("period_start", period.startsAt)
+      .lt("period_start", period.resetsAt),
   ]);
   check(account.error);
   check(grants.error);
   check(accesses.error);
+  check(freeUsage.error);
   const now = Date.now();
   return {
     ...base,
+    free: {
+      ...base.free,
+      used: freeUsage.count || 0,
+      remaining: Math.max(0, FREE_EXPORT_LIMIT - (freeUsage.count || 0)),
+    },
+    canManageBilling: Boolean(account.data?.customer_id),
     remaining: (grants.data || []).reduce(
       (n, g) =>
         n +
@@ -713,6 +742,11 @@ export function dailyRenderCap() {
   return Number.isInteger(cap) && cap >= 1 && cap <= 1000 ? cap : 10;
 }
 export function exportBillingError(message: string) {
+  if (message.includes("Free export allowance"))
+    return new BillingError(
+      402,
+      "Your two free video exports for this month have been used. Upgrade for more exports, or wait until the next UTC calendar month. Your edits are saved.",
+    );
   if (message.includes("Payment required"))
     return new BillingError(402, PAYMENT_REQUIRED);
   if (message.includes("Project export allowance"))

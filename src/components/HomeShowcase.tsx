@@ -147,7 +147,7 @@ export function HomeShowcase() {
           Use this style <ArrowUpRight size={17} />
         </Link>
         <p className={styles.hint}>
-          Switch a style. Change the format.
+          Choose a style. Change the format.
           <br />
           This is the same renderer you’ll use.
         </p>

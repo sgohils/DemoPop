@@ -753,7 +753,7 @@ export function CreateFromLink({
       <main className={styles.main}>
         <section className={styles.intro} aria-labelledby="create-title">
           <div className={styles.eyebrow}>
-            <span /> CREATE FROM LINK
+            <span /> CREATE FROM A LINK
           </div>
           <h1 id="create-title">
             Your website.
@@ -811,7 +811,7 @@ export function CreateFromLink({
             </div>
             <p id="create-help" className={styles.hint}>
               {configured
-                ? "Free personalized preview with an account. A package activates only when you export."
+                ? "Sign in for a free personalized preview and two single-video exports each month. No card required."
                 : "Use a public website. Or try your own screenshots in the studio."}
             </p>
             {!draft && (
@@ -996,7 +996,7 @@ export function CreateFromLink({
                 {needsPlan && draft && (
                   <>
                     {" "}
-                    Your reviewed draft is saved.{" "}
+                    Your edits are saved.{" "}
                     <Link href={pricingPath({ projectId: draft.projectId })}>
                       Choose a package to export →
                     </Link>
@@ -1017,8 +1017,8 @@ export function CreateFromLink({
             {configured
               ? billingRequired
                 ? ready
-                  ? "Edit and export revisions within this project's 30-day package window. Each new website starts a separate project."
-                  : "Preview first, pay when you export. The same project includes a 30-day revision window after activation."
+                  ? "Your video is saved. Free accounts include two single-video exports each month; paid packages include a 30-day revision window."
+                  : "Preview and edit for free, then use two free single-video exports each month. Upgrade for nine-video campaigns and more revisions."
                 : "Sign in when prompted. Your video and editable project are saved to your account."
               : "Local videos expire after 45 minutes. Download your MP4 to keep it."}
           </p>
@@ -1135,8 +1135,9 @@ export function CreateFromLink({
                 <span>PRIVATE PREVIEW · NOT AN EXPORT</span>
                 <h2>Make it yours before it goes out.</h2>
                 <p>
-                  Review the words and framing. Your package starts when you
-                  export, with the same captured screens.
+                  Review the words and framing, then export with the same
+                  captured screens. Two single-video exports are free each
+                  month.
                 </p>
                 <button
                   type="button"
@@ -1167,8 +1168,8 @@ export function CreateFromLink({
               <div className={styles.status}>
                 <h2>Your video is ready.</h2>
                 <p>
-                  We could not load the playback link. Refresh the result to
-                  open your finished video.
+                  We could not load your finished video. Refresh its playback
+                  link to try again.
                 </p>
               </div>
               <div className={styles.connectionError}>
@@ -1204,11 +1205,11 @@ export function CreateFromLink({
                   {pollError
                     ? "We lost the status connection. Check again to pick up where you left off."
                     : submitting || job?.status === "capturing"
-                      ? "Capturing your pages, colors, and product details."
+                      ? "Capturing your page, colors, and product details."
                       : job?.status === "preparing"
                         ? "Arranging your captures, titles, and soundtrack."
                         : job?.status === "rendering"
-                          ? "Rendering the finished MP4. Keep this page open."
+                          ? "Creating your finished MP4. Keep this page open to follow its progress."
                           : "Waiting for rendering to begin. This can take a few minutes."}
                 </p>
               </div>
@@ -1322,7 +1323,7 @@ export function CreateFromLink({
       <footer className={styles.footer}>
         <span>A big first impression starts with a small link.</span>
         <Link href="/editor/new">
-          Prefer to make it your own? Open the studio <ArrowRight size={13} />
+          Want more control? Open the studio <ArrowRight size={13} />
         </Link>
       </footer>
     </div>

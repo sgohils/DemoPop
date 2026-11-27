@@ -144,8 +144,8 @@ export function RecipeLibrary({
   return (
     <div className="recipe-library">
       <p className="section-hint">
-        Save a repeatable launch. Apply it to this edit, then replace individual
-        screens while keeping their captions, framing, and timing.{" "}
+        Save your story as a recipe. Apply it to another project, then replace
+        individual screens while keeping their captions, framing, and timing.{" "}
         {cloud
           ? "Recipes stay in your account."
           : "Recipes and selected media stay in this browser."}
@@ -172,7 +172,9 @@ export function RecipeLibrary({
         Save launch recipe
       </button>
       {!scope && (
-        <p className="section-hint">Sign in to use account recipes.</p>
+        <p className="section-hint">
+          Sign in to save and use recipes in your account.
+        </p>
       )}
       {error && (
         <p className="error" role="alert">

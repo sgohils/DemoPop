@@ -19,7 +19,9 @@ const ease = Easing.bezier(0.22, 1, 0.36, 1);
 const imageFailure = () => {
   try {
     cancelRender(
-      new Error("A video image could not load. Retry image access."),
+      new Error(
+        "A video image could not be loaded. Refresh its access and try again.",
+      ),
     );
   } catch {
     // Remotion stores this sanitized render error before throwing. Avoid logging

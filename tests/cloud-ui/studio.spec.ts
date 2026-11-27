@@ -399,7 +399,7 @@ test("password recovery requests a link and validates the replacement password",
       requested = true;
       return respond(route, {
         message:
-          "If an account exists for that email, a recovery link will arrive shortly.",
+          "If an account exists for that email, a password reset link will arrive shortly.",
       });
     }
     if (path === "/api/auth/password") {
@@ -413,11 +413,11 @@ test("password recovery requests a link and validates the replacement password",
   });
   await page.goto("/auth");
   await page
-    .getByRole("button", { name: "Forgot password?", exact: true })
+    .getByRole("button", { name: "Forgot your password?", exact: true })
     .click();
   await page.getByLabel("Email address").fill("designer@example.test");
   await page
-    .getByRole("button", { name: "Send recovery link", exact: true })
+    .getByRole("button", { name: "Send reset link", exact: true })
     .click();
   await expect(page.getByRole("status")).toContainText("If an account exists");
   expect(requested).toBe(true);

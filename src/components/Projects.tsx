@@ -80,7 +80,8 @@ export function Projects({ configured }: { configured: boolean }) {
         const data = await r.json();
         if (!r.ok)
           throw new RequestError(
-            data.error || "Your projects could not load. Please try again.",
+            data.error ||
+              "Your projects could not be loaded. Please try again.",
             r.status,
           );
         if (live) setProjects(data.projects);
@@ -91,7 +92,7 @@ export function Projects({ configured }: { configured: boolean }) {
             message:
               e instanceof RequestError
                 ? e.message
-                : "Your projects could not load. Check your connection and try again.",
+                : "Your projects could not be loaded. Check your connection and try again.",
             status: e instanceof RequestError ? e.status : undefined,
             source: "load",
           });
@@ -108,7 +109,7 @@ export function Projects({ configured }: { configured: boolean }) {
     if (
       action === "trash" &&
       !window.confirm(
-        "Move this project to trash? You can restore it before the retention period ends.",
+        "Move this project to Trash? You can restore it until it is permanently removed under the retention policy.",
       )
     )
       return;
@@ -130,7 +131,7 @@ export function Projects({ configured }: { configured: boolean }) {
         action === "duplicate"
           ? "Project duplicated. The copy is ready to open."
           : action === "trash"
-            ? "Project moved to trash."
+            ? "Project moved to Trash."
             : "Project restored.",
       );
     } catch (failure) {
@@ -152,14 +153,17 @@ export function Projects({ configured }: { configured: boolean }) {
     try {
       const r = await fetch("/api/auth/logout", { method: "POST" });
       if (!r.ok)
-        throw new RequestError("Sign out failed. Please retry.", r.status);
+        throw new RequestError(
+          "We could not sign you out. Please try again.",
+          r.status,
+        );
       router.push("/");
     } catch (e) {
       setError({
         message:
           e instanceof RequestError
             ? e.message
-            : "Sign out could not finish. Check your connection and try again.",
+            : "We could not sign you out. Check your connection and try again.",
         status: e instanceof RequestError ? e.status : undefined,
         source: "action",
       });
@@ -218,7 +222,7 @@ export function Projects({ configured }: { configured: boolean }) {
               Your projects<span className="heading-dot">.</span>
             </h1>
             <p>
-              Your client launches, ready for their next version. Or{" "}
+              Keep your launches ready for their next update, or{" "}
               <Link href="/create" className="text-link">
                 create a video from a link <ArrowUpRight size={12} />
               </Link>
@@ -235,8 +239,8 @@ export function Projects({ configured }: { configured: boolean }) {
             <div>
               <strong>Your local studio is ready.</strong>
               <p>
-                Try the editor and recover drafts in this browser. Cloud
-                projects and MP4 export aren’t connected in this workspace.
+                Edit and preview videos, or restore drafts saved in this
+                browser. Account saving and exports are currently unavailable.
               </p>
             </div>
             <Link href="/editor/new">
@@ -314,9 +318,9 @@ export function Projects({ configured }: { configured: boolean }) {
         )}
         {trash && (
           <p className={styles.trashNotice}>
-            Trashed projects can be restored until your workspace retention
-            cleanup runs. Active exports must finish before a project can be
-            trashed.
+            Projects in Trash can be restored until they are permanently removed
+            under the retention policy. Wait for active exports to finish before
+            moving a project to Trash.
           </p>
         )}
         {message && (
@@ -529,8 +533,8 @@ export function Projects({ configured }: { configured: boolean }) {
             </h2>
             <p>
               {trash
-                ? "Projects you move to trash will appear here."
-                : "Start with our sample, or bring your own before and after."}
+                ? "Projects you move to Trash will appear here."
+                : "Start with our sample, or use your own screenshots and clips."}
             </p>
             {trash ? (
               <button className="text-link" onClick={() => setTrash(false)}>

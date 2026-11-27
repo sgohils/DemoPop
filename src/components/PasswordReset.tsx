@@ -35,7 +35,7 @@ export function PasswordReset({ configured }: { configured: boolean }) {
     <>
       <header className="site-header">
         <Brand />
-        <Link href="/auth">Back to sign in</Link>
+        <Link href="/auth">Back to sign-in</Link>
       </header>
       <main className="recovery-page auth-card">
         <h1>{done ? "Password updated." : "Choose a new password"}</h1>
@@ -49,11 +49,14 @@ export function PasswordReset({ configured }: { configured: boolean }) {
         ) : (
           <>
             <p>
-              Open the recovery link from your email before submitting this
-              form.
+              Open the password reset link in your email, then enter and confirm
+              your new password.
             </p>
             {!configured && (
-              <p className="notice">Password recovery needs Supabase setup.</p>
+              <p className="notice">
+                Password resets are currently unavailable. Please try again
+                later.
+              </p>
             )}
             <form onSubmit={submit}>
               <label>
@@ -82,8 +85,7 @@ export function PasswordReset({ configured }: { configured: boolean }) {
               </label>
               {error && (
                 <p role="alert" className="error">
-                  {error}{" "}
-                  <Link href="/auth">Request another recovery link</Link>
+                  {error} <Link href="/auth">Request a new reset link</Link>
                 </p>
               )}
               <button className="button primary" disabled={!configured || busy}>

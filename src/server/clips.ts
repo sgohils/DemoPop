@@ -32,7 +32,7 @@ export async function prepareClip(bytes: Buffer) {
       metadata.pixelFormat !== "yuv420p"
     )
       throw new Error(
-        "Use a 0.1–30 second H.264 MP4, yuv420p, up to 4096 pixels and 60 fps.",
+        "Use an H.264 MP4 clip between 0.1 and 30 seconds long, in yuv420p format, up to 4096 pixels and 60 fps.",
       );
     const ffmpeg = RenderInternals.getExecutablePath({
       type: "ffmpeg",

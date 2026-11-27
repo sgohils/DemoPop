@@ -27,7 +27,7 @@ const transition = (frame: number, start: number, end: number) =>
   });
 const failImage = () => {
   try {
-    cancelRender(new Error("A video image could not load."));
+    cancelRender(new Error("A video image could not be loaded."));
   } catch {}
 };
 const textStyle: CSSProperties = {

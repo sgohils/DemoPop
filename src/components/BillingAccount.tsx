@@ -40,7 +40,10 @@ export function BillingAccount({
         });
         const body = await response.json();
         if (!response.ok)
-          throw new Error(body.error || "Billing could not load.");
+          throw new Error(
+            body.error ||
+              "Your billing details could not be loaded. Please try again.",
+          );
         if (signal?.aborted) return;
         setSummary(body);
         if (sessionId && body.signedIn) {
@@ -71,7 +74,8 @@ export function BillingAccount({
             const next = await refreshed.json();
             if (!refreshed.ok)
               throw new Error(
-                next.error || "Your balance could not refresh. Please retry.",
+                next.error ||
+                  "Your export balance could not be refreshed. Please try again.",
               );
             if (!signal?.aborted) setSummary(next);
           } else
@@ -87,7 +91,7 @@ export function BillingAccount({
           setError(
             failure instanceof Error
               ? failure.message
-              : "Billing could not load.",
+              : "Your billing details could not be loaded. Please try again.",
           );
           if (sessionId) setMessage("");
         }
@@ -109,16 +113,21 @@ export function BillingAccount({
       const response = await fetch("/api/billing/portal", { method: "POST" });
       const body = await response.json();
       if (!response.ok)
-        throw new Error(body.error || "Billing could not be opened.");
+        throw new Error(
+          body.error ||
+            "Your billing portal could not be opened. Please try again.",
+        );
       const url = new URL(body.url);
       if (url.protocol !== "https:" || url.hostname !== "billing.stripe.com")
-        throw new Error("Billing could not be opened.");
+        throw new Error(
+          "Your billing portal could not be opened. Please try again.",
+        );
       window.location.assign(url.href);
     } catch (failure) {
       setError(
         failure instanceof Error
           ? failure.message
-          : "Billing could not be opened.",
+          : "Your billing portal could not be opened. Please try again.",
       );
       setPortalBusy(false);
     }
@@ -157,8 +166,8 @@ export function BillingAccount({
         <div className={styles.accountCard}>
           <h2>Your packages, in one place.</h2>
           <p>
-            Sign in to see your purchases, manage Studio, and pick up your next
-            client project.
+            Sign in to use your free monthly exports, see your purchases, and
+            manage Studio.
           </p>
           <Link
             href={`/auth?next=${encodeURIComponent(billingPath({ sessionId, projectId }))}`}
@@ -168,10 +177,10 @@ export function BillingAccount({
         </div>
       ) : summary && !summary.enabled ? (
         <div className={styles.accountCard}>
-          <h2>Your free studio preview is ready.</h2>
+          <h2>You’re using the free beta.</h2>
           <p>
-            Paid plans are not available yet. You can try the editor with your
-            own media.
+            Paid plans are disabled for this workspace. You can edit, save, and
+            export videos within the daily limit.
           </p>
           <Link href="/editor/new">
             Open the studio <ArrowUpRight size={14} />
@@ -206,13 +215,51 @@ export function BillingAccount({
               </section>
             )}
             <div className={styles.accountGrid}>
+              {summary.free && (
+                <section className={styles.accountCard} aria-label="Free plan">
+                  <h2>Your free monthly exports</h2>
+                  <div className={styles.balance}>
+                    {summary.free.remaining}{" "}
+                    <span>of {summary.free.limit}</span>
+                  </div>
+                  <p>
+                    Single-video MP4 exports remaining. Full quality, no
+                    watermark, and no card required. Queued exports count toward
+                    your allowance; failed exports do not.
+                  </p>
+                  <p>
+                    Resets{" "}
+                    {new Date(summary.free.resetsAt).toLocaleDateString(
+                      undefined,
+                      {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                        timeZone: "UTC",
+                      },
+                    )}{" "}
+                    at 00:00 UTC. Unused free exports do not roll over.
+                  </p>
+                  <Link
+                    href={
+                      returnProjectId ? `/editor/${returnProjectId}` : "/create"
+                    }
+                  >
+                    {summary.free.remaining
+                      ? "Create your free video"
+                      : "Keep editing your next video"}{" "}
+                    <ArrowUpRight size={14} />
+                  </Link>
+                </section>
+              )}
               <section className={styles.accountCard}>
-                <h2>Ready for your next launch</h2>
+                <h2>Your paid project packages</h2>
                 <div className={styles.balance}>{summary.remaining}</div>
                 <p>
                   Unused project{" "}
-                  {summary.remaining === 1 ? "package" : "packages"}. A project
-                  activates its 30-day revision window on the first export.
+                  {summary.remaining === 1 ? "package" : "packages"}. A paid
+                  package activates its 30-day revision window on the first paid
+                  export.
                 </p>
                 <Link
                   href={
@@ -226,17 +273,23 @@ export function BillingAccount({
                 <h2>
                   {summary.subscription
                     ? "Your Studio subscription"
-                    : "One launch or your next five"}
+                    : "Upgrade when you need more"}
                 </h2>
                 <p>
                   {summary.subscription
                     ? `${summary.subscription.status.replaceAll("_", " ")}${summary.subscription.cancelAtPeriodEnd ? " · ends after your current billing period" : ""}. Five new project packages are added after each successful monthly payment.`
-                    : "Buy one package for $29, or choose Studio at $79/month for five new client projects."}
+                    : "Buy one project package for $29, or choose Studio at $79/month for five new project packages each month."}
                 </p>
-                <button disabled={portalBusy} onClick={() => void manage()}>
-                  {portalBusy && <Loader2 className="spin" size={14} />}Manage
-                  billing & receipts <ArrowUpRight size={14} />
-                </button>
+                {summary.canManageBilling !== false ? (
+                  <button disabled={portalBusy} onClick={() => void manage()}>
+                    {portalBusy && <Loader2 className="spin" size={14} />}Manage
+                    billing & receipts <ArrowUpRight size={14} />
+                  </button>
+                ) : (
+                  <Link href={pricingPath({ projectId: returnProjectId })}>
+                    Upgrade for campaign packages <ArrowUpRight size={14} />
+                  </Link>
+                )}
               </section>
             </div>
             <section
@@ -245,10 +298,7 @@ export function BillingAccount({
             >
               <h2 id="active-projects">Projects in their revision window</h2>
               {!summary.projects.length && (
-                <p>
-                  Your activated projects will appear here after their first
-                  export.
-                </p>
+                <p>Projects appear here after their first paid export.</p>
               )}
               <ul className={styles.projectList}>
                 {summary.projects.map((project, index) => (
@@ -256,7 +306,8 @@ export function BillingAccount({
                     <div>
                       <Link href={`/editor/${project.id}`}>{project.name}</Link>
                       <p>
-                        {project.exportsUsed} of 10 exports used · access until{" "}
+                        {project.exportsUsed} of 10 exports used · revision
+                        window ends{" "}
                         {new Date(project.expiresAt).toLocaleDateString(
                           undefined,
                           { month: "short", day: "numeric", year: "numeric" },

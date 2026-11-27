@@ -183,7 +183,7 @@ test("personalized preview is free; reviewed edits survive payment and export th
     .filter({ visible: true })
     .click();
   await expect(page.getByRole("main").getByRole("alert")).toContainText(
-    "Your reviewed draft is saved",
+    "Your edits are saved",
   );
   await expect(
     page.getByRole("link", { name: "Choose a package to export" }),

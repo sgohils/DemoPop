@@ -32,9 +32,9 @@ export default async function Billing({
         <div className={styles.intro}>
           <p className={styles.eyebrow}>YOUR LAUNCH WORKSPACE</p>
           <h1>
-            Good work.
+            Your plan.
             <br />
-            <span>Clear accounts.</span>
+            <span>Your exports.</span>
           </h1>
         </div>
         <BillingAccount sessionId={sessionId} projectId={projectId} />
