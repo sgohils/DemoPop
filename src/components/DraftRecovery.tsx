@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   readDraft,
   writeDraft,
@@ -29,11 +29,20 @@ export function DraftRecovery({
   const [candidate, setCandidate] = useState<Draft | null>(null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+  const actionInProgress = useRef(false);
+  const actionId = useRef(0);
+  const currentKey = useRef(key);
+  currentKey.current = key;
+  const [pendingAction, setPendingAction] = useState<
+    "restore" | "discard" | "retry" | null
+  >(null);
+  const busy = pendingAction !== null;
   useEffect(() => {
     if (!key) return;
     let live = true;
+    actionId.current += 1;
+    actionInProgress.current = false;
+    setPendingAction(null);
     setReady(null);
     setCandidate(null);
     setError("");
@@ -46,26 +55,30 @@ export function DraftRecovery({
         }
       })
       .catch(() => {
-        if (live)
+        if (live) {
           setError(
             "Browser draft storage is unavailable. Keep this tab open to preserve your edits.",
           );
+        }
       });
     return () => {
       live = false;
     };
-  }, [key, attempt]);
+  }, [key]);
   useEffect(() => {
-    if (!key || ready !== key || candidate) return;
+    if (!key || ready !== key || candidate || pendingAction) return;
     let live = true;
-    setMessage(dirty ? "Saving browser draft…" : "");
+    if (dirty) setMessage("Saving browser draft…");
     const timer = setTimeout(() => {
       const action = dirty
         ? writeDraft({ key, project, assets, updatedAt: Date.now() })
         : removeDraft(key);
       action
         .then(() => {
-          if (live) setMessage(dirty ? "Draft saved in this browser" : "");
+          if (live && dirty) {
+            setError("");
+            setMessage("Draft saved in this browser");
+          }
         })
         .catch(() => {
           if (live)
@@ -78,35 +91,85 @@ export function DraftRecovery({
       live = false;
       clearTimeout(timer);
     };
-  }, [key, ready, candidate, project, dirty, assets]);
+  }, [key, ready, candidate, project, dirty, assets, pendingAction]);
   async function restore() {
-    if (!candidate) return;
-    setBusy(true);
+    if (!candidate || actionInProgress.current) return;
+    const actionKey = key;
+    const id = ++actionId.current;
+    actionInProgress.current = true;
+    setPendingAction("restore");
     setError("");
     try {
       await onRestore(candidate);
-      setCandidate(null);
-      setMessage(
-        scope === "local"
-          ? "Draft restored on this device."
-          : "Draft restored. Save to your account when ready.",
-      );
+      if (currentKey.current === actionKey && actionId.current === id) {
+        setCandidate(null);
+        setMessage(
+          scope === "local"
+            ? "Draft restored on this device."
+            : "Draft restored. Save to your account when ready.",
+        );
+      }
     } catch {
-      setError(
-        "The draft could not be restored. Sign in if needed, then retry.",
-      );
+      if (currentKey.current === actionKey && actionId.current === id)
+        setError("The draft could not be restored. Sign in if needed, then retry.");
     } finally {
-      setBusy(false);
+      if (currentKey.current === actionKey && actionId.current === id) {
+        actionInProgress.current = false;
+        setPendingAction(null);
+      }
     }
   }
   async function discard() {
-    if (!key) return;
+    if (!key || actionInProgress.current) return;
+    const actionKey = key;
+    const id = ++actionId.current;
+    actionInProgress.current = true;
+    setPendingAction("discard");
+    setError("");
+    setMessage("Discarding draft…");
     try {
-      await removeDraft(key);
-      setCandidate(null);
-      setMessage("");
+      await removeDraft(actionKey);
+      if (currentKey.current === actionKey && actionId.current === id) {
+        setCandidate(null);
+        setMessage("Draft discarded.");
+      }
     } catch {
-      setError("The draft could not be cleared. Please retry.");
+      if (currentKey.current === actionKey && actionId.current === id) {
+        setMessage("");
+        setError("The draft could not be cleared. Try discarding again.");
+      }
+    } finally {
+      if (currentKey.current === actionKey && actionId.current === id) {
+        actionInProgress.current = false;
+        setPendingAction(null);
+      }
+    }
+  }
+  async function retry() {
+    if (!key || actionInProgress.current) return;
+    const actionKey = key;
+    const id = ++actionId.current;
+    actionInProgress.current = true;
+    setPendingAction("retry");
+    setMessage("");
+    setError("");
+    try {
+      const value = await readDraft(actionKey);
+      if (currentKey.current === actionKey && actionId.current === id) {
+        setCandidate(value);
+        setReady(actionKey);
+        setMessage("");
+      }
+    } catch {
+      if (currentKey.current === actionKey && actionId.current === id) {
+        setMessage("");
+        setError("Browser draft storage is unavailable. Keep this tab open to preserve your edits.");
+      }
+    } finally {
+      if (currentKey.current === actionKey && actionId.current === id) {
+        actionInProgress.current = false;
+        setPendingAction(null);
+      }
     }
   }
   if (!key) return null;
@@ -123,24 +186,26 @@ export function DraftRecovery({
             onClick={restore}
             disabled={busy}
           >
-            {busy ? "Restoring…" : "Restore draft"}
+            {pendingAction === "restore" ? "Restoring…" : "Restore draft"}
           </button>
           <button className="text-link" onClick={discard} disabled={busy}>
-            Discard draft
+            {pendingAction === "discard" ? "Discarding…" : "Discard draft"}
           </button>
+          {message && <span role="status">{message}</span>}
         </div>
       ) : (
         <span role="status">{message || "Drafts stay in this browser."}</span>
+      )}
+      {pendingAction === "retry" && (
+        <span role="status">Checking browser draft storage…</span>
       )}
       {error && (
         <p className="error" role="alert">
           {error}{" "}
           <button
             className="text-link"
-            onClick={() => {
-              setError("");
-              setAttempt((x) => x + 1);
-            }}
+            disabled={busy}
+            onClick={retry}
           >
             Retry draft storage
           </button>
